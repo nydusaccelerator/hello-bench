@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import os, sys, subprocess, select, random, urllib2, time, json, tempfile, shutil
+import os, sys, subprocess, select, random, urllib.request, time, json, tempfile, shutil
 
 NGINX_PORT = 20000
 IOJS_PORT = 20001
@@ -318,7 +318,7 @@ class BenchRunner:
         p = subprocess.Popen(cmd, shell=True)
         while True:
             try:
-                req = urllib2.urlopen("http://localhost:%d" % NGINX_PORT)
+                req = urllib.request.urlopen("http://localhost:%d" % NGINX_PORT)
                 req.close()
                 break
             except:
@@ -341,7 +341,7 @@ class BenchRunner:
         p = subprocess.Popen(cmd, shell=True)
         while True:
             try:
-                req = urllib2.urlopen("http://localhost:%d" % IOJS_PORT)
+                req = urllib.request.urlopen("http://localhost:%d" % IOJS_PORT)
                 print(req.read().strip())
                 req.close()
                 break
@@ -365,7 +365,7 @@ class BenchRunner:
         p = subprocess.Popen(cmd, shell=True)
         while True:
             try:
-                req = urllib2.urlopen("http://localhost:%d" % NODE_PORT)
+                req = urllib.request.urlopen("http://localhost:%d" % NODE_PORT)
                 print(req.read().strip())
                 req.close()
                 break
@@ -386,7 +386,7 @@ class BenchRunner:
         p = subprocess.Popen(cmd, shell=True)
         while True:
             try:
-                req = urllib2.urlopen("http://localhost:%d" % REGISTRY_PORT)
+                req = urllib.request.urlopen("http://localhost:%d" % REGISTRY_PORT)
                 print(req.read().strip())
                 req.close()
                 break
