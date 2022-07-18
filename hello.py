@@ -22,7 +22,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import os, sys, subprocess, select, random, urllib.request, time, json, tempfile, shutil
+import logging
+import os, sys, subprocess, select, random, urllib.request, time, json, tempfile, shutil, copy
+
+from argparse import ArgumentParser
 
 NGINX_PORT = 20000
 IOJS_PORT = 20001
@@ -69,6 +72,9 @@ class Bench:
 
     def __str__(self):
         return json.dumps(self.__dict__)
+
+    def set_tag(self, tag):
+        self.name = f"{self.name}:{tag}"
 
 
 class BenchRunner:
@@ -230,7 +236,11 @@ class BenchRunner:
     )
 
     def __init__(
-        self, docker="docker", registry="localhost:5000", registry2="localhost:5000"
+        self,
+        docker="docker",
+        registry="localhost:5000",
+        registry2="localhost:5000",
+        run_args="",
     ):
         self.docker = docker
         self.registry = registry
@@ -240,6 +250,8 @@ class BenchRunner:
         if self.registry2 != "":
             self.registry2 += "/"
 
+        self.run_args = run_args
+
     def run_echo_hello(self, repo):
         cmd = "%s run %s%s echo hello" % (self.docker, self.registry, repo)
         rc = os.system(cmd)
@@ -247,7 +259,7 @@ class BenchRunner:
 
     def run_cmd_arg(self, repo, runargs):
         assert len(runargs.mount) == 0
-        cmd = "%s run " % self.docker
+        cmd = "%s run --rm --net none " % self.docker
         cmd += "%s%s " % (self.registry, repo)
         cmd += runargs.arg
         print(cmd)
@@ -399,20 +411,22 @@ class BenchRunner:
         p.wait()
 
     def run(self, bench):
-        name = bench.name
-        if name in BenchRunner.ECHO_HELLO:
-            self.run_echo_hello(repo=name)
-        elif name in BenchRunner.CMD_ARG:
-            self.run_cmd_arg(repo=name, runargs=BenchRunner.CMD_ARG[name])
-        elif name in BenchRunner.CMD_ARG_WAIT:
-            self.run_cmd_arg_wait(repo=name, runargs=BenchRunner.CMD_ARG_WAIT[name])
-        elif name in BenchRunner.CMD_STDIN:
-            self.run_cmd_stdin(repo=name, runargs=BenchRunner.CMD_STDIN[name])
-        elif name in BenchRunner.CUSTOM:
-            fn = BenchRunner.__dict__[BenchRunner.CUSTOM[name]]
+        repo = image_repo(bench.name)
+        if repo in BenchRunner.ECHO_HELLO:
+            self.run_echo_hello(repo=bench.name)
+        elif repo in BenchRunner.CMD_ARG:
+            self.run_cmd_arg(repo=bench.name, runargs=BenchRunner.CMD_ARG[repo])
+        elif repo in BenchRunner.CMD_ARG_WAIT:
+            self.run_cmd_arg_wait(
+                repo=bench.name, runargs=BenchRunner.CMD_ARG_WAIT[repo]
+            )
+        elif repo in BenchRunner.CMD_STDIN:
+            self.run_cmd_stdin(repo=bench.name, runargs=BenchRunner.CMD_STDIN[repo])
+        elif repo in BenchRunner.CUSTOM:
+            fn = BenchRunner.__dict__[BenchRunner.CUSTOM[repo]]
             fn(self)
         else:
-            print("Unknown bench: " + name)
+            print("Unknown bench: " + repo)
             exit(1)
 
     def pull(self, bench):
@@ -450,52 +464,109 @@ class BenchRunner:
             exit(1)
 
 
-HELP_MESSAGE = """
-'Usage: bench.py [OPTIONS] [BENCHMARKS]'
-'OPTIONS:'
-'--docker=<binary>'
-'--registry=<registry>'
-'--registry2=<registry2>'
-'--all'
-'--list'
-'--list-json'
-'--op=(run|push|pull|tag)'
-"""
+def image_repo(ref: str):
+    return ref.split(":")[0]
+
+
+def image_tag(ref: str) -> str:
+    try:
+        return ref.split(":")[1]
+    except IndexError:
+        return None
 
 
 def main():
-    if len(sys.argv) == 1:
-        print(HELP_MESSAGE)
-        exit(1)
-
     benches = []
     kvargs = {"out": "bench.out"}
-    # parse args
-    for arg in sys.argv[1:]:
-        if arg.startswith("--"):
-            parts = arg[2:].split("=")
-            if len(parts) == 2:
-                kvargs[parts[0]] = parts[1]
-            elif parts[0] == "all":
-                benches.extend(BenchRunner.ALL.values())
-            elif parts[0] == "list":
-                template = "%-16s\t%-20s"
-                print(template % ("CATEGORY", "NAME"))
-                for b in sorted(
-                    BenchRunner.ALL.values(), key=lambda b: (b.category, b.name)
-                ):
-                    print(template % (b.category, b.name))
-            elif parts[0] == "list-json":
-                print(json.dumps([b.__dict__ for b in BenchRunner.ALL.values()]))
-        else:
-            benches.append(BenchRunner.ALL[arg])
+
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--images-list",
+        nargs="+",
+        dest="images_list",
+        type=str,
+        default="",
+    )
+
+    parser.add_argument(
+        "--docker",
+        type=str,
+        default="docker",
+    )
+
+    parser.add_argument(
+        "--run-args",
+        dest="run_args",
+        type=str,
+        default="",
+    )
+
+    parser.add_argument(
+        "--registry",
+        type=str,
+        default="",
+    )
+
+    parser.add_argument(
+        "--registry2",
+        type=str,
+        default="",
+    )
+
+    parser.add_argument(
+        "--all", dest="all_supported_images", action="store_true", required=False
+    )
+
+    parser.add_argument(
+        "--op",
+        type=str,
+        choices=["run", "push", "pull", "tag"],
+        default="pull",
+    )
+
+    parser.add_argument(
+        "--snapshotter",
+        type=str,
+        choices=["overlayfs", "nydus", "stargz"],
+        default="overlayfs",
+    )
+
+    parser.add_argument(
+        "--tag",
+        type=str,
+        default="latest",
+    )
+
+    args = parser.parse_args()
+
+    op = args.op
+    registry = args.registry
+    registry2 = args.registry2
+    docker = args.docker
+    all_supported_images = args.all_supported_images
+    images_list = args.images_list
+    run_args = args.run_args
+
+    if all_supported_images:
+        benches.extend(BenchRunner.ALL.values())
+    else:
+        for i in images_list:
+            try:
+                bench = copy.deepcopy(BenchRunner.ALL[image_repo(i)])
+                tag = image_tag(i)
+                if tag is not None:
+                    bench.set_tag(tag)
+
+                benches.append(bench)
+            except KeyError:
+                logging.warning("image %s not supported, skip", i)
 
     outpath = kvargs.pop("out")
     op = kvargs.pop("op", "run")
     f = open(outpath, "w")
 
     # run benchmarks
-    runner = BenchRunner(**kvargs)
+    runner = BenchRunner(docker=docker, registry=registry, registry2=registry2)
     for bench in benches:
         start = time.time()
         runner.operation(op, bench)
