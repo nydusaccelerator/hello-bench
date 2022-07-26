@@ -48,6 +48,35 @@ def tmp_dir():
 tmp_dir.nxt = 0
 
 
+def logging_setup(logging_stream=sys.stderr):
+    """Inspired from Kadalu project"""
+    root = logging.getLogger()
+
+    if root.hasHandlers():
+        return
+
+    verbose = True
+
+    # Errors should also be printed to screen.
+    handler = logging.StreamHandler(logging_stream)
+
+    if verbose:
+        root.setLevel(logging.DEBUG)
+        handler.setLevel(logging.DEBUG)
+    else:
+        root.setLevel(logging.INFO)
+        handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)s "
+        "[%(module)s - %(lineno)s:%(funcName)s] "
+        "- %(message)s"
+    )
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+
+
+logging_setup()
 def tmp_copy(src):
     dst = tmp_dir()
     shutil.copytree(src, dst)
