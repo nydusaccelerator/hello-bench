@@ -77,6 +77,25 @@ def logging_setup(logging_stream=sys.stderr):
 
 
 logging_setup()
+
+
+def run(cmd, wait: bool = True, verbose=True, **kwargs):
+
+    shell = kwargs.pop("shell", False)
+    if shell:
+        cmd = " ".join(cmd)
+
+    if verbose:
+        logging.info(cmd)
+    else:
+        logging.debug(cmd)
+
+    popen_obj = subprocess.Popen(cmd, shell=shell, **kwargs)
+    if wait:
+        popen_obj.wait()
+    return popen_obj.returncode, popen_obj
+
+
 def tmp_copy(src):
     dst = tmp_dir()
     shutil.copytree(src, dst)
