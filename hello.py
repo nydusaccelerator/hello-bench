@@ -312,7 +312,7 @@ class BenchRunner:
             cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
         print(runargs.stdin)
-        out, _ = p.communicate(runargs.stdin)
+        out, _ = p.communicate(runargs.stdin.encode())
         print(out)
         p.wait()
         assert p.returncode == 0
