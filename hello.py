@@ -24,7 +24,7 @@
 
 import logging
 import os, sys, subprocess, select, random, urllib.request, time, json, tempfile, shutil, copy
-
+import posixpath
 from argparse import ArgumentParser
 
 NGINX_PORT = 20000
@@ -110,6 +110,53 @@ class RunArgs:
         self.stdin_sh = stdin_sh
         self.waitline = waitline
         self.mount = mount
+
+
+class Docker:
+    def __init__(self, bin="docker"):
+        self.bin = bin
+        self.cmd = []
+
+    def image(self, ref):
+        self.image_ref = ref
+        return self
+
+    def run(
+        self,
+        network="none",
+        enable_stdin=False,
+        run_cmd_args=None,
+        volumes=[],
+        stdin=None,
+    ):
+        cmd = self.cmd
+        cmd = [self.bin, "run", "--rm"]
+        cmd.append(f"--net={network}")
+
+        if enable_stdin:
+            cmd.append("-i")
+
+        for (s, d) in volumes:
+            cmd.extend(["-v", f"{s}:{d}"])
+
+        cmd.append(self.image_ref)
+
+        if run_cmd_args is not None:
+            cmd.append(run_cmd_args)
+
+        _, p = run(
+            cmd,
+            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            wait=False,
+        )
+
+        out = p.communicate(input=stdin)
+        p.wait()
+
+        assert p.returncode == 0
 
 
 class Bench:
@@ -302,18 +349,16 @@ class BenchRunner:
         return posixpath.join(self.registry, repo)
 
     def run_echo_hello(self, repo):
-        cmd = "%s run %s%s echo hello" % (self.docker, self.registry, repo)
-        rc = os.system(cmd)
-        assert rc == 0
+        image_ref = self.image_ref(repo)
+        docker = Docker(self.docker)
+        docker.image(image_ref).run(run_cmd_args="echo hello")
 
     def run_cmd_arg(self, repo, runargs):
         assert len(runargs.mount) == 0
-        cmd = "%s run --rm --net none " % self.docker
-        cmd += "%s%s " % (self.registry, repo)
-        cmd += runargs.arg
-        print(cmd)
-        rc = os.system(cmd)
-        assert rc == 0
+
+        image_ref = self.image_ref(repo)
+        docker = Docker(self.docker)
+        docker.image(image_ref).run(run_cmd_args=runargs.arg)
 
     def run_cmd_arg_wait(self, repo, runargs):
         name = "%s_bench_%d" % (repo, random.randint(1, 1000000))
@@ -347,26 +392,30 @@ class BenchRunner:
         p.wait()
 
     def run_cmd_stdin(self, repo, runargs):
-        cmd = "%s run " % self.docker
+        image_ref = self.image_ref(repo)
+        docker = Docker(self.docker)
+        docker.image(image_ref)
+        volumes = []
+
         for a, b in runargs.mount:
             a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
             a = tmp_copy(a)
-            cmd += "-v %s:%s " % (a, b)
-        cmd += "-i %s%s " % (self.registry, repo)
-        if runargs.stdin_sh:
-            cmd += runargs.stdin_sh  # e.g., sh -c
+            volumes.append((a, b))
 
-        print(cmd)
-        p = subprocess.Popen(
-            cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE
+        if runargs.stdin_sh:
+            run_cmd_args = runargs.stdin_sh  # e.g., sh -c
+        else:
+            run_cmd_args = None
+        # print(docker.cmd)
+        docker.run(
+            run_cmd_args=run_cmd_args,
+            enable_stdin=True,
+            volumes=volumes,
+            stdin=runargs.stdin,
         )
-        print(runargs.stdin)
-        out, _ = p.communicate(runargs.stdin.encode())
-        print(out)
-        p.wait()
-        assert p.returncode == 0
 
     def run_nginx(self):
+
         name = "nginx_bench_%d" % (random.randint(1, 1000000))
         cmd = "%s run --name=%s -p %d:%d %snginx" % (
             self.docker,
