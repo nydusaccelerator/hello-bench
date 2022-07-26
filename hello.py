@@ -298,7 +298,8 @@ class BenchRunner:
         if self.registry2 != "":
             self.registry2 += "/"
 
-        self.run_args = run_args
+    def image_ref(self, repo):
+        return posixpath.join(self.registry, repo)
 
     def run_echo_hello(self, repo):
         cmd = "%s run %s%s echo hello" % (self.docker, self.registry, repo)
