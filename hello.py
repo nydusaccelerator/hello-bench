@@ -588,7 +588,7 @@ def main():
 
     parser = ArgumentParser()
     parser.add_argument(
-        "--images-list",
+        "--images",
         nargs="+",
         dest="images_list",
         type=str,
@@ -596,7 +596,7 @@ def main():
     )
 
     parser.add_argument(
-        "--docker",
+        "--engine",
         type=str,
         default="docker",
     )
@@ -643,7 +643,7 @@ def main():
     op = args.op
     registry = args.registry
     registry2 = args.registry2
-    docker = args.docker
+    docker = args.engine
     all_supported_images = args.all_supported_images
     images_list = args.images_list
     snapshotter = args.snapshotter
