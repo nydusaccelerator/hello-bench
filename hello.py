@@ -594,13 +594,6 @@ def main():
     )
 
     parser.add_argument(
-        "--run-args",
-        dest="run_args",
-        type=str,
-        default="",
-    )
-
-    parser.add_argument(
         "--registry",
         type=str,
         default="",
