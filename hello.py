@@ -122,6 +122,10 @@ class Docker:
         self.image_ref = ref
         return self
 
+    def set_snapshotter(self, sn="overlayfs"):
+        self.snapshotter = sn
+        return self
+
     def run(
         self,
         network="none",
@@ -131,7 +135,7 @@ class Docker:
         stdin=None,
     ):
         cmd = self.cmd
-        cmd = [self.bin, "run", "--rm"]
+        cmd = [self.bin, "--snapshotter", self.snapshotter, "run", "--rm"]
         cmd.append(f"--net={network}")
 
         if enable_stdin:
@@ -336,9 +340,8 @@ class BenchRunner:
         docker="docker",
         registry="localhost:5000",
         registry2="localhost:5000",
-        run_args="",
+        snapshotter="overlayfs",
     ):
-        self.docker = docker
         self.registry = registry
         if self.registry != "":
             self.registry += "/"
@@ -346,19 +349,25 @@ class BenchRunner:
         if self.registry2 != "":
             self.registry2 += "/"
 
+        self.snapshotter = snapshotter
+
+        self.docker = Docker(bin=docker)
+        if "nerdctl" == docker:
+            self.docker.set_snapshotter(snapshotter)
+
     def image_ref(self, repo):
         return posixpath.join(self.registry, repo)
 
     def run_echo_hello(self, repo):
         image_ref = self.image_ref(repo)
-        docker = Docker(self.docker)
+        docker = self.docker
         docker.set_image(image_ref).run(run_cmd_args="echo hello")
 
     def run_cmd_arg(self, repo, runargs):
         assert len(runargs.mount) == 0
 
         image_ref = self.image_ref(repo)
-        docker = Docker(self.docker)
+        docker = self.docker
         docker.set_image(image_ref).run(run_cmd_args=runargs.arg)
 
     def run_cmd_arg_wait(self, repo, runargs):
@@ -394,7 +403,7 @@ class BenchRunner:
 
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
-        docker = Docker(self.docker)
+        docker = self.docker
         docker.set_image(image_ref)
         volumes = []
 
@@ -412,7 +421,7 @@ class BenchRunner:
             run_cmd_args=run_cmd_args,
             enable_stdin=True,
             volumes=volumes,
-            stdin=runargs.stdin,
+            stdin=runargs.stdin.encode() if runargs.stdin else None,
         )
 
     def run_nginx(self):
@@ -618,6 +627,7 @@ def main():
     parser.add_argument(
         "--snapshotter",
         type=str,
+        help="only applied with containerd",
         choices=["overlayfs", "nydus", "stargz"],
         default="overlayfs",
     )
@@ -636,7 +646,7 @@ def main():
     docker = args.docker
     all_supported_images = args.all_supported_images
     images_list = args.images_list
-    run_args = args.run_args
+    snapshotter = args.snapshotter
 
     if all_supported_images:
         benches.extend(BenchRunner.ALL.values())
@@ -657,7 +667,9 @@ def main():
     f = open(outpath, "w")
 
     # run benchmarks
-    runner = BenchRunner(docker=docker, registry=registry, registry2=registry2)
+    runner = BenchRunner(
+        docker=docker, registry=registry, registry2=registry2, snapshotter=snapshotter
+    )
     for bench in benches:
         start = time.time()
         runner.operation(op, bench)
