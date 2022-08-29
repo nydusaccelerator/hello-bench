@@ -118,7 +118,7 @@ class Docker:
         self.bin = bin
         self.cmd = []
 
-    def image(self, ref):
+    def set_image(self, ref):
         self.image_ref = ref
         return self
 
@@ -352,14 +352,14 @@ class BenchRunner:
     def run_echo_hello(self, repo):
         image_ref = self.image_ref(repo)
         docker = Docker(self.docker)
-        docker.image(image_ref).run(run_cmd_args="echo hello")
+        docker.set_image(image_ref).run(run_cmd_args="echo hello")
 
     def run_cmd_arg(self, repo, runargs):
         assert len(runargs.mount) == 0
 
         image_ref = self.image_ref(repo)
         docker = Docker(self.docker)
-        docker.image(image_ref).run(run_cmd_args=runargs.arg)
+        docker.set_image(image_ref).run(run_cmd_args=runargs.arg)
 
     def run_cmd_arg_wait(self, repo, runargs):
         name = "%s_bench_%d" % (repo, random.randint(1, 1000000))
@@ -395,7 +395,7 @@ class BenchRunner:
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
         docker = Docker(self.docker)
-        docker.image(image_ref)
+        docker.set_image(image_ref)
         volumes = []
 
         for a, b in runargs.mount:
@@ -416,7 +416,6 @@ class BenchRunner:
         )
 
     def run_nginx(self):
-
         name = "nginx_bench_%d" % (random.randint(1, 1000000))
         cmd = "%s run --name=%s -p %d:%d %snginx" % (
             self.docker,
