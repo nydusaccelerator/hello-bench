@@ -1,21 +1,29 @@
 # HelloBench
 
-HelloBench is a new Docker benchmark focused on container startup latency.
+HelloBench is originally authored by @tylerharter. The original repository is not active for quite a long time. I forked the repository from commit `0fa7a8c7950615cb5aae04a85226f04f88ad3bda`.
+As Python2 had reached its EOL, hello-bench adapts Python3 to attract more young python developers.
 
-### HelloBench Images
+Nowadays, several container image acceleration solutions around containerd and CRI-O/podman are being introduced. This forked project is aiming at building a universal container startup benchmark tool. Acceleration images usually differs OCI images by image tags. So the improved hello-bench can receive image tags now.
 
-This git repo just contains the benchmark harness than runs various Docker images; it does not contain the images themselves.  One (not recommended) way to fetch the images is by using the hello.py script to pull the images from the Docker Hub:
+## Run HelloBench
 
-```./hello.py --registry= --op=pull --all```
+This repository just contains the benchmark harness than runs various Docker, OCI and other acceleration container images e.g. nydus and stargz.
 
-The advantage of the above command is that it will fetch all the latest HelloBench images.  The disadvantage is that we don't plan to keep the benchmark script in sync with the latest changes in the Docker Hub.  That means some of the images may become unavailable, or may change in a way that breaks the hello.py script.
+Please ensure your `nerdctl` is beyond v0.22
 
-A (typically) better way to get the images is to download a snapshot of the images that is known to work with the script.  This also allows comparisons with results from others who run the benchmark.  Such a snapshot of the images is available as a single [tar.gz](http://research.cs.wisc.edu/adsl/Software/hello-bench/reg-dir.tar.gz) at on the [ADSL Website](http://research.cs.wisc.edu/adsl/Software/hello-bench/) at the University of Wisconsin-Madison.
+Both docker and containerd can manage container images. Containerd has more a flexible mechanism - snapshots - to add plugin and manage containers images. To run benchmark for different container engines, change hello-bench argument `--engine`.
 
-To start a Docker registry hosting the snapshot, extract "reg-dir" from the snapshot, and start a v2 registry using that directory for storage as follows:
+- docker for Docker
+- nerdctl for Containerd
 
-```docker run -d -p 5000:5000 -v `pwd`/reg-dir:/tmp/registry-dev registry:2```
+```shell
+./hello.py --engine nerdctl --op run --images python:3.7
+./hello.py --engine docker --op run --images python:3.7
 
-### Examples
+# To run benchmark for nydus snapshotter.
+./hello.py --engine nerdctl --snapshotter nydus --op run --registry=gechangwei --images python:3.7-nydus
+```
+
+## Examples
 
 TODO
