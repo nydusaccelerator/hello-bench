@@ -219,7 +219,8 @@ class BenchRunner:
             env={"MYSQL_ROOT_PASSWORD": "abc"}, waitline="mysqld: ready for connections"
         ),
         "mariadb": RunArgs(
-            env={"MYSQL_ROOT_PASSWORD": "abc"}, waitline="mysqld: ready for connections"
+            env={"MYSQL_ROOT_PASSWORD": "abc"},
+            waitline="mariadbd: ready for connections",
         ),
         "postgres": RunArgs(waitline="database system is ready to accept connections"),
         "redis": RunArgs(waitline="server is now ready to accept connections"),
@@ -385,36 +386,34 @@ class BenchRunner:
         docker = self.docker
         docker.set_image(image_ref).run(run_cmd_args=runargs.arg)
 
-    def run_cmd_arg_wait(self, repo, runargs):
+    def run_cmd_arg_wait(self, tagged: str, runargs):
+        repo = tagged.split(":")[0]
         name = "%s_bench_%d" % (repo, random.randint(1, 1000000))
-        env = " ".join(["-e %s=%s" % (k, v) for k, v in runargs.env.iteritems()])
-        cmd = "%s run --name=%s %s %s%s %s" % (
-            self.docker,
-            name,
-            env,
-            self.registry,
-            repo,
-            runargs.arg,
+
+        envs = [(k, v) for k, v in runargs.env.items()]
+
+        r, w = os.pipe()
+        reader = os.fdopen(r)
+        writer = os.fdopen(w)
+
+        image_ref = self.image_ref(tagged)
+        docker = self.docker
+        p = docker.set_image(image_ref).run(
+            name=name, envs=envs, background=True, stdout=writer
         )
-        print(cmd)
-        # line buffer output
-        p = subprocess.Popen(
-            cmd, shell=True, bufsize=1, stderr=subprocess.STDOUT, stdout=subprocess.PIPE
-        )
+
         while True:
-            l = p.stdout.readline()
+            l = reader.readline()
             if l == "":
                 continue
             print("out: " + l.strip())
             # are we done?
+            ra = l.find(runargs.waitline)
             if l.find(runargs.waitline) >= 0:
                 # cleanup
                 print("DONE")
-                cmd = "%s kill %s" % (self.docker, name)
-                rc = os.system(cmd)
-                assert rc == 0
+                docker.kill(name)
                 break
-        p.wait()
 
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -431,7 +430,7 @@ class BenchRunner:
             run_cmd_args = runargs.stdin_sh  # e.g., sh -c
         else:
             run_cmd_args = None
-        # print(docker.cmd)
+
         docker.run(
             run_cmd_args=run_cmd_args,
             enable_stdin=True,
@@ -540,7 +539,7 @@ class BenchRunner:
             self.run_cmd_arg(repo=bench.name, runargs=BenchRunner.CMD_ARG[repo])
         elif repo in BenchRunner.CMD_ARG_WAIT:
             self.run_cmd_arg_wait(
-                repo=bench.name, runargs=BenchRunner.CMD_ARG_WAIT[repo]
+                tagged=bench.name, runargs=BenchRunner.CMD_ARG_WAIT[repo]
             )
         elif repo in BenchRunner.CMD_STDIN:
             self.run_cmd_stdin(repo=bench.name, runargs=BenchRunner.CMD_STDIN[repo])
