@@ -169,14 +169,24 @@ class Docker:
         )
 
         if stdin is not None:
-        out = p.communicate(input=stdin)
+            out = p.communicate(input=stdin)
 
         if not background:
-        p.wait()
-        assert p.returncode == 0
+            p.wait()
+            assert p.returncode == 0
         else:
             return p
 
+    def kill(self, name):
+        cmd = [self.bin, "kill", name]
+        _, p = run(
+            cmd,
+            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            wait=True,
+        )
 
 
 class Bench:
