@@ -116,7 +116,6 @@ class RunArgs:
 class Docker:
     def __init__(self, bin="docker"):
         self.bin = bin
-        self.cmd = []
 
     def set_image(self, ref):
         self.image_ref = ref
@@ -129,20 +128,31 @@ class Docker:
     def run(
         self,
         network="none",
+        name=None,
+        background=False,
         enable_stdin=False,
+        envs=[],
         run_cmd_args=None,
         volumes=[],
         stdin=None,
+        stdout=None,
     ):
-        cmd = self.cmd
-        cmd = [self.bin, "--snapshotter", self.snapshotter, "run", "--rm"]
+        cmd = [self.bin, "--snapshotter", self.snapshotter, "run"]
         cmd.append(f"--net={network}")
 
         if enable_stdin:
             cmd.append("-i")
 
+        cmd.append("--rm")
+
+        if name is not None:
+            cmd.append(f"--name={name}")
+
         for (s, d) in volumes:
             cmd.extend(["-v", f"{s}:{d}"])
+
+        for (k, v) in envs:
+            cmd.extend(["-e", f"{k}={v}"])
 
         cmd.append(self.image_ref)
 
@@ -153,15 +163,20 @@ class Docker:
             cmd,
             shell=True,
             stdin=subprocess.PIPE,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
+            stdout=sys.stdout if stdout is None else stdout,
+            stderr=sys.stderr if stdout is None else stdout,
             wait=False,
         )
 
+        if stdin is not None:
         out = p.communicate(input=stdin)
-        p.wait()
 
+        if not background:
+        p.wait()
         assert p.returncode == 0
+        else:
+            return p
+
 
 
 class Bench:
