@@ -24,8 +24,9 @@
 # SOFTWARE.
 
 import logging
-import os, sys, subprocess, select, random, urllib.request, time, json, tempfile, shutil, copy
+import os, sys, subprocess, random, urllib.request, time, json, tempfile, shutil, copy
 import posixpath
+import string
 from argparse import ArgumentParser
 from datetime import datetime
 from contextlib import contextmanager
@@ -80,6 +81,10 @@ def logging_setup(logging_stream=sys.stderr):
 
 
 logging_setup()
+
+
+def random_chars():
+    return "".join(random.choice(string.ascii_lowercase) for i in range(10))
 
 
 def run(cmd, wait: bool = True, verbose=True, **kwargs):
@@ -427,9 +432,9 @@ class BenchRunner:
     def image_ref(self, repo):
         return posixpath.join(self.registry, repo)
 
-    def run_echo_hello(self, repo):
+    def run_echo_hello(self, repo: str):
         image_ref = self.image_ref(repo)
-        container_id = repo.replace(":", "-")
+        container_name = repo.replace(":", "-") + random_chars()
 
         pull_cmd = self.pull_cmd(image_ref)
         print(pull_cmd)
@@ -438,21 +443,21 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_time = t
 
-        create_cmd = self.create_echo_hello_cmd(image_ref, container_id)
+        create_cmd = self.create_echo_hello_cmd(image_ref, container_name)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
             create_time = t
 
-        run_cmd = self.task_start_cmd(container_id, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=False)
         print(run_cmd)
 
-        print("Running container %s ..." % container_id)
+        print("Running container %s ..." % container_name)
         with timer(run_cmd) as t:
             run_time = t
         if self.cleanup:
-            self.clean_up(image_ref, container_id)
+            self.clean_up(image_ref, container_name)
 
         return pull_time, create_time, run_time
 
@@ -460,7 +465,7 @@ class BenchRunner:
         assert len(runargs.mount) == 0
 
         image_ref = self.image_ref(repo)
-        container_id = repo.replace(":", "-")
+        container_name = repo.replace(":", "-") + random_chars()
 
         pull_cmd = self.pull_cmd(image_ref)
         print(pull_cmd)
@@ -469,27 +474,27 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_time = t
 
-        create_cmd = self.create_cmd_arg_cmd(image_ref, container_id, runargs)
+        create_cmd = self.create_cmd_arg_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
             create_time = t
 
-        run_cmd = self.task_start_cmd(container_id, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=False)
         print(run_cmd)
 
         with timer(run_cmd) as t:
             run_time = t
 
         if self.cleanup:
-            self.clean_up(image_ref, container_id)
+            self.clean_up(image_ref, container_name)
 
         return pull_time, create_time, run_time
 
     def run_cmd_arg_wait(self, repo, runargs):
         image_ref = self.image_ref(repo)
-        container_id = repo.replace(":", "-")
+        container_name = repo.replace(":", "-") + random_chars()
 
         pull_cmd = self.pull_cmd(image_ref)
         print(pull_cmd)
@@ -498,21 +503,21 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_time = t
 
-        create_cmd = self.create_cmd_arg_wait_cmd(image_ref, container_id, runargs)
+        create_cmd = self.create_cmd_arg_wait_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
             create_time = t
 
-        run_cmd = self.task_start_cmd(container_id, iteration=True)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
         r, w = os.pipe()
         reader = os.fdopen(r)
         writer = os.fdopen(w)
 
-        print("Running container %s ..." % container_id)
+        print("Running container %s ..." % container_name)
         start_run = datetime.now()
 
         p = subprocess.Popen(run_cmd, shell=True, stdout=writer, stderr=writer)
@@ -531,13 +536,13 @@ class BenchRunner:
         print("Run time: %f s" % run_time)
 
         if self.cleanup:
-            self.clean_up(image_ref, container_id)
+            self.clean_up(image_ref, container_name)
 
         return pull_time, create_time, run_time
 
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
-        container_id = repo.replace(":", "-")
+        container_name = repo.replace(":", "-") + random_chars()
 
         pull_cmd = self.pull_cmd(image_ref)
         print(pull_cmd)
@@ -546,17 +551,17 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_time = t
 
-        create_cmd = self.create_cmd_stdin_cmd(image_ref, container_id, runargs)
+        create_cmd = self.create_cmd_stdin_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
             create_time = t
 
-        run_cmd = self.task_start_cmd(container_id, iteration=True)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
-        print("Running container %s ..." % container_id)
+        print("Running container %s ..." % container_name)
         start_run = datetime.now()
 
         p = subprocess.Popen(
@@ -579,7 +584,7 @@ class BenchRunner:
         print("Run time: %f s" % run_time)
 
         if self.cleanup:
-            self.clean_up(image_ref, container_id)
+            self.clean_up(image_ref, container_name)
 
         return pull_time, create_time, run_time
 
