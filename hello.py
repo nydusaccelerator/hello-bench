@@ -414,6 +414,7 @@ class BenchRunner:
         registry2="localhost:5000",
         snapshotter="overlayfs",
         cleanup=True,
+        insecure_registry=False,
     ):
         self.registry = registry
         if self.registry != "":
@@ -423,6 +424,7 @@ class BenchRunner:
             self.registry2 += "/"
 
         self.snapshotter = snapshotter
+        self.insecure_registry = insecure_registry
 
         self.docker = Docker(bin=docker)
         if "nerdctl" == docker:
@@ -655,7 +657,8 @@ class BenchRunner:
             exit(1)
 
     def pull_cmd(self, image_ref):
-        return f"nerdctl --snapshotter {self.snapshotter} pull {image_ref}"
+        insecure_flag = "--insecure-registry" if self.insecure_registry else ""
+        return f"nerdctl --snapshotter {self.snapshotter} pull {insecure_flag} {image_ref}"
 
     def create_echo_hello_cmd(self, image_ref, container_id):
         return f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} -- echo hello"
@@ -832,6 +835,9 @@ def main():
     parser.add_argument(
         "--no-cleanup", dest="no_cleanup", action="store_true", required=False
     )
+    parser.add_argument(
+        "--insecure-registry", dest="insecure_registry", action="store_true", required=False
+    )
 
     args = parser.parse_args()
 
@@ -843,6 +849,7 @@ def main():
     images_list = args.images_list
     snapshotter = args.snapshotter
     cleanup = not args.no_cleanup
+    insecure_registry = args.insecure_registry
 
     if all_supported_images:
         benches.extend(BenchRunner.ALL.values())
@@ -870,12 +877,14 @@ def main():
         registry2=registry2,
         snapshotter=snapshotter,
         cleanup=cleanup,
+        insecure_registry=insecure_registry,
     )
 
     for bench in benches:
         pull_time, create_time, run_time = runner.operation(op, bench)
 
         row = {
+            "timestamp": int(time.time()*1000),
             "repo": bench.repo,
             "bench": bench.name,
             "pull_time": f"{pull_time: .6f}",
