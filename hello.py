@@ -443,25 +443,25 @@ class BenchRunner:
 
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
-            pull_time = t
+            pull_elapsed = t
 
         create_cmd = self.create_echo_hello_cmd(image_ref, container_name)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
-            create_time = t
+            create_elapsed = t
 
         run_cmd = self.task_start_cmd(container_name, iteration=False)
         print(run_cmd)
 
         print("Running container %s ..." % container_name)
         with timer(run_cmd) as t:
-            run_time = t
+            run_elapsed = t
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_time, create_time, run_time
+        return pull_elapsed, create_elapsed, run_elapsed
 
     def run_cmd_arg(self, repo, runargs):
         assert len(runargs.mount) == 0
@@ -474,25 +474,25 @@ class BenchRunner:
 
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
-            pull_time = t
+            pull_elapsed = t
 
         create_cmd = self.create_cmd_arg_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
-            create_time = t
+            create_elapsed = t
 
         run_cmd = self.task_start_cmd(container_name, iteration=False)
         print(run_cmd)
 
         with timer(run_cmd) as t:
-            run_time = t
+            run_elapsed = t
 
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_time, create_time, run_time
+        return pull_elapsed, create_elapsed, run_elapsed
 
     def run_cmd_arg_wait(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -503,14 +503,14 @@ class BenchRunner:
 
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
-            pull_time = t
+            pull_elapsed = t
 
         create_cmd = self.create_cmd_arg_wait_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
-            create_time = t
+            create_elapsed = t
 
         run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
@@ -532,15 +532,17 @@ class BenchRunner:
             # are we done?
             if l.find(runargs.waitline) >= 0:
                 end_run = datetime.now()
-                run_time = datetime.timestamp(end_run) - datetime.timestamp(start_run)
+                run_elapsed = datetime.timestamp(end_run) - datetime.timestamp(
+                    start_run
+                )
                 print("DONE")
                 break
-        print("Run time: %f s" % run_time)
+        print("Run time: %f s" % run_elapsed)
 
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_time, create_time, run_time
+        return pull_elapsed, create_elapsed, run_elapsed
 
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -551,14 +553,14 @@ class BenchRunner:
 
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
-            pull_time = t
+            pull_elapsed = t
 
         create_cmd = self.create_cmd_stdin_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
-            create_time = t
+            create_elapsed = t
 
         run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
@@ -579,16 +581,16 @@ class BenchRunner:
         stdin = runargs.stdin + "\nexit\n"
         p.communicate(stdin.encode())
         end_run = datetime.now()
-        run_time = datetime.timestamp(end_run) - datetime.timestamp(start_run)
+        run_elapsed = datetime.timestamp(end_run) - datetime.timestamp(start_run)
         print("p.returncode:", p.returncode)
         # assert(p.returncode == 0)
 
-        print("Run time: %f s" % run_time)
+        print("Run time: %f s" % run_elapsed)
 
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_time, create_time, run_time
+        return pull_elapsed, create_elapsed, run_elapsed
 
     def run_cmd_url_wait(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -599,14 +601,14 @@ class BenchRunner:
 
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
-            pull_time = t
+            pull_elapsed = t
 
         create_cmd = self.create_cmd_url_wait_cmd(image_ref, container_id, runargs)
         print(create_cmd)
 
         print("Creating container for image %s ..." % image_ref)
         with timer(create_cmd) as t:
-            create_time = t
+            create_elapsed = t
 
         run_cmd = self.task_start_cmd(container_id, iteration=False)
         print(run_cmd)
@@ -625,14 +627,14 @@ class BenchRunner:
                 pass  # retry
 
         end_run = datetime.now()
-        run_time = datetime.timestamp(end_run) - datetime.timestamp(start_run)
+        run_elapsed = datetime.timestamp(end_run) - datetime.timestamp(start_run)
 
-        print("Run time: %f s" % run_time)
+        print("Run time: %f s" % run_elapsed)
 
         if self.cleanup:
             self.clean_up(image_ref, container_id)
 
-        return pull_time, create_time, run_time
+        return pull_elapsed, create_elapsed, run_elapsed
 
     def run(self, bench):
         repo = image_repo(bench.name)
@@ -658,7 +660,9 @@ class BenchRunner:
 
     def pull_cmd(self, image_ref):
         insecure_flag = "--insecure-registry" if self.insecure_registry else ""
-        return f"nerdctl --snapshotter {self.snapshotter} pull {insecure_flag} {image_ref}"
+        return (
+            f"nerdctl --snapshotter {self.snapshotter} pull {insecure_flag} {image_ref}"
+        )
 
     def create_echo_hello_cmd(self, image_ref, container_id):
         return f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} -- echo hello"
@@ -836,7 +840,18 @@ def main():
         "--no-cleanup", dest="no_cleanup", action="store_true", required=False
     )
     parser.add_argument(
-        "--insecure-registry", dest="insecure_registry", action="store_true", required=False
+        "--insecure-registry",
+        dest="insecure_registry",
+        action="store_true",
+        required=False,
+    )
+
+    parser.add_argument(
+        "--out-format",
+        dest="output_format",
+        type=str,
+        choices=["csv", "json"],
+        default="json",
     )
 
     args = parser.parse_args()
@@ -850,6 +865,8 @@ def main():
     snapshotter = args.snapshotter
     cleanup = not args.no_cleanup
     insecure_registry = args.insecure_registry
+
+    output_format = args.output_format
 
     if all_supported_images:
         benches.extend(BenchRunner.ALL.values())
@@ -880,22 +897,38 @@ def main():
         insecure_registry=insecure_registry,
     )
 
-    for bench in benches:
-        pull_time, create_time, run_time = runner.operation(op, bench)
-
-        row = {
-            "timestamp": int(time.time()*1000),
-            "repo": bench.repo,
-            "bench": bench.name,
-            "pull_time": f"{pull_time: .6f}",
-            "create_time": f"{create_time: .6f}",
-            "run_time": f"{run_time: .6f}",
-            "elapsed": f"{pull_time + create_time + run_time: .6f}",
-        }
-        js = json.dumps(row)
-        print(js)
-        f.write(js + "\n")
+    if output_format == "csv":
+        csv_headers = "timestamp,repo,bench,pull_elapsed(s),create_elapsed(s),run_elapsed(s),total_elapsed(s)"
+        f.writelines(csv_headers + "\n")
         f.flush()
+
+    for bench in benches:
+        pull_elapsed, create_elapsed, run_elapsed = runner.operation(op, bench)
+
+        total_elapsed = f"{pull_elapsed + create_elapsed + run_elapsed: .6f}"
+        timetamp = int(time.time() * 1000)
+        pull_elapsed = f"{pull_elapsed: .6f}"
+        create_elapsed = f"{create_elapsed: .6f}"
+        run_elapsed = f"{run_elapsed: .6f}"
+
+        if output_format == "json":
+            row = {
+                "timestamp": timetamp,
+                "repo": bench.repo,
+                "bench": bench.name,
+                "pull_elapsed": pull_elapsed,
+                "create_elapsed": create_elapsed,
+                "run_elapsed": run_elapsed,
+                "total_elapsed": total_elapsed,
+            }
+            line = json.dumps(row)
+        elif output_format == "csv":
+            line = f"{timetamp},{bench.repo},{bench.name},{pull_elapsed},{create_elapsed},{run_elapsed},{total_elapsed}"
+
+        print(line)
+        f.writelines(line + "\n")
+        f.flush()
+
     f.close()
 
 
