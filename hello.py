@@ -782,7 +782,7 @@ def image_tag(ref: str) -> str:
 
 def main():
     benches = []
-    kvargs = {"out": "bench.out"}
+    kvargs = {"out": "bench"}
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -854,6 +854,13 @@ def main():
         default="json",
     )
 
+    parser.add_argument(
+        "--bench-times",
+        dest="bench_times",
+        type=int,
+        default= 1,
+    )
+
     args = parser.parse_args()
 
     op = args.op
@@ -867,6 +874,7 @@ def main():
     insecure_registry = args.insecure_registry
 
     output_format = args.output_format
+    bench_times = args.bench_times
 
     if all_supported_images:
         benches.extend(BenchRunner.ALL.values())
@@ -885,7 +893,7 @@ def main():
 
     outpath = kvargs.pop("out")
     op = kvargs.pop("op", "run")
-    f = open(outpath, "w")
+    f = open(outpath + "." + output_format, "w")
 
     # run benchmarks
     runner = BenchRunner(
@@ -903,31 +911,32 @@ def main():
         f.flush()
 
     for bench in benches:
-        pull_elapsed, create_elapsed, run_elapsed = runner.operation(op, bench)
+        for _ in range(bench_times):
+            pull_elapsed, create_elapsed, run_elapsed = runner.operation(op, bench)
 
-        total_elapsed = f"{pull_elapsed + create_elapsed + run_elapsed: .6f}"
-        timetamp = int(time.time() * 1000)
-        pull_elapsed = f"{pull_elapsed: .6f}"
-        create_elapsed = f"{create_elapsed: .6f}"
-        run_elapsed = f"{run_elapsed: .6f}"
+            total_elapsed = f"{pull_elapsed + create_elapsed + run_elapsed: .6f}"
+            timetamp = int(time.time() * 1000)
+            pull_elapsed = f"{pull_elapsed: .6f}"
+            create_elapsed = f"{create_elapsed: .6f}"
+            run_elapsed = f"{run_elapsed: .6f}"
 
-        if output_format == "json":
-            row = {
-                "timestamp": timetamp,
-                "repo": bench.repo,
-                "bench": bench.name,
-                "pull_elapsed": pull_elapsed,
-                "create_elapsed": create_elapsed,
-                "run_elapsed": run_elapsed,
-                "total_elapsed": total_elapsed,
-            }
-            line = json.dumps(row)
-        elif output_format == "csv":
-            line = f"{timetamp},{bench.repo},{bench.name},{pull_elapsed},{create_elapsed},{run_elapsed},{total_elapsed}"
+            if output_format == "json":
+                row = {
+                    "timestamp": timetamp,
+                    "repo": bench.repo,
+                    "bench": bench.name,
+                    "pull_elapsed": pull_elapsed,
+                    "create_elapsed": create_elapsed,
+                    "run_elapsed": run_elapsed,
+                    "total_elapsed": total_elapsed,
+                }
+                line = json.dumps(row)
+            elif output_format == "csv":
+                line = f"{timetamp},{bench.repo},{bench.name},{pull_elapsed},{create_elapsed},{run_elapsed},{total_elapsed}"
 
-        print(line)
-        f.writelines(line + "\n")
-        f.flush()
+            print(line)
+            f.writelines(line + "\n")
+            f.flush()
 
     f.close()
 
