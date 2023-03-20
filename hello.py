@@ -289,26 +289,26 @@ class BenchRunner:
         "ruby": RunArgs(stdin='ruby -e "puts \\"hello\\""'),
         "jruby": RunArgs(stdin='jruby -e "puts \\"hello\\""'),
         "julia": RunArgs(stdin="julia -e 'println(\"hello\")'"),
-        "gcc": RunArgs(stdin="cd /src; gcc main.c; ./a.out", mount=[("gcc", "/src")]),
+        "gcc": RunArgs(stdin="cd /src; gcc main.c; ./a.out", mount=[("misc/mount/gcc", "/src")]),
         "golang": RunArgs(
-            stdin="cd /go/src; go run main.go", mount=[("go", "/go/src")]
+            stdin="cd /go/src; go run main.go", mount=[("misc/mount/go", "/go/src")]
         ),
         "clojure": RunArgs(
-            stdin="cd /hello/hello; lein run", mount=[("clojure", "/hello")]
+            stdin="cd /hello/hello; lein run", mount=[("misc/mount/clojure", "/hello")]
         ),
         "django": RunArgs(stdin="django-admin startproject hello"),
         "rails": RunArgs(stdin="rails new hello"),
         "haskell": RunArgs(stdin='"hello"', stdin_sh=None),
         "hylang": RunArgs(stdin='(print "hello")', stdin_sh=None),
         "java": RunArgs(
-            stdin="cd /src; javac Main.java; java Main", mount=[("java", "/src")]
+            stdin="cd /src; javac Main.java; java Main", mount=[("misc/mount/java", "/src")]
         ),
         "mono": RunArgs(
-            stdin="cd /src; mcs main.cs; mono main.exe", mount=[("mono", "/src")]
+            stdin="cd /src; mcs main.cs; mono main.exe", mount=[("misc/mount/mono", "/src")]
         ),
         "r-base": RunArgs(stdin='sprintf("hello")', stdin_sh="R --no-save"),
         "thrift": RunArgs(
-            stdin="cd /src; thrift --gen py hello.idl", mount=[("thrift", "/src")]
+            stdin="cd /src; thrift --gen py hello.idl", mount=[("misc/mount/thrift", "/src")]
         ),
         "benchmark": RunArgs(
             stdin='sed -i "s/.cuda()//g" /benchmark/vision/test.py; sed -i "s/cuda/cpu/g" /benchmark/vision/test.py; sed -i "/^  assert/d" /benchmark/vision/test.py; sed -i "s/required=True/required=False/g" /benchmark/vision/test.py; sed -i "s/20/1/g" /benchmark/vision/test.py; cd /benchmark; python /benchmark/vision/test.py'
@@ -327,12 +327,12 @@ class BenchRunner:
         "nginx": RunArgs(waitURL="http://localhost:80"),
         "iojs": RunArgs(
             arg="iojs /src/index.js",
-            mount=[("iojs", "/src")],
+            mount=[("misc/mount/iojs", "/src")],
             waitURL="http://localhost:80",
         ),
         "node": RunArgs(
             arg="node /src/index.js",
-            mount=[("node", "/src")],
+            mount=[("misc/mount/node", "/src")],
             waitURL="http://localhost:80",
         ),
         "registry": RunArgs(
