@@ -140,17 +140,6 @@ function run() {
     echo ${result} >>${RESULT_DIR}/${RESULT_FILE}.${CURRENT_ROUND}
     echo "[INFO] Remove image ${TARGET_REGISTRY}/${image}:nydusv6 ..."
     sudo nerdctl --snapshotter nydus rmi -f ${TARGET_REGISTRY}/${image}:nydusv6 >/dev/null 2>&1
-
-    echo "[INFO] Run hello bench in ${image}:stargz ..."
-    sudo nerdctl --snapshotter stargz rmi -f ${TARGET_REGISTRY}/${image}:stargz >/dev/null 2>&1
-    result=$(sudo ./hello.py --engine nerdctl --snapshotter stargz --op run \
-        --registry=${TARGET_REGISTRY} \
-        --images ${image}:stargz |
-        grep "repo")
-    echo ${result}
-    echo ${result} >>${RESULT_DIR}/${RESULT_FILE}.${CURRENT_ROUND}
-    echo "[INFO] Remove image ${TARGET_REGISTRY}/${image}:stargz ..."
-    sudo nerdctl --snapshotter stargz rmi -f ${TARGET_REGISTRY}/${image}:stargz >/dev/null 2>&1
 }
 
 #########################################################
