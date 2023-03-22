@@ -1,0 +1,355 @@
+CMD_ARG:
+- bench_args:
+    arg: perl -e 'print("hello\n")'
+    stdin_sh: sh
+  category: language
+  image: perl
+  repo: perl
+- bench_args:
+    arg: perl6 -e 'print("hello\n")'
+    stdin_sh: sh
+  category: language
+  image: rakudo-star
+  repo: rakudo-star
+- bench_args:
+    arg: pypy3 -c 'print("hello")'
+    stdin_sh: sh
+  category: language
+  image: pypy
+  repo: pypy
+- bench_args:
+    arg: python -c 'print("hello")'
+    stdin_sh: sh
+  category: language
+  image: python
+  repo: python
+- bench_args:
+    stdin_sh: sh
+  category: other
+  image: hello-world
+  repo: hello-world
+CMD_ARG_WAIT:
+- bench_args:
+    envs:
+    - key: MYSQL_ROOT_PASSWORD
+      value: abc
+    stdin_sh: sh
+    wait_line: 'mysqld: ready for connections'
+  category: database
+  image: mysql
+  repo: mysql
+- bench_args:
+    envs:
+    - key: MYSQL_ROOT_PASSWORD
+      value: abc
+    stdin_sh: sh
+    wait_line: 'mysqld: ready for connections'
+  category: database
+  image: percona
+  repo: percona
+- bench_args:
+    envs:
+    - key: MYSQL_ROOT_PASSWORD
+      value: abc
+    stdin_sh: sh
+    wait_line: 'mariadbd: ready for connections'
+  category: database
+  image: mariadb
+  repo: mariadb
+- bench_args:
+    stdin_sh: sh
+    wait_line: database system is ready to accept connections
+  category: database
+  image: postgres
+  repo: postgres
+- bench_args:
+    stdin_sh: sh
+    wait_line: Ready to accept connections
+  category: database
+  image: redis
+  repo: redis
+- bench_args:
+    stdin_sh: sh
+    wait_line: started
+  category: database
+  image: crate
+  repo: crate
+- bench_args:
+    stdin_sh: sh
+    wait_line: Server ready
+  category: database
+  image: rethinkdb
+  repo: rethinkdb
+- bench_args:
+    stdin_sh: sh
+    wait_line: Listening for thrift clients
+  category: database
+  image: cassandra
+  repo: cassandra
+- bench_args:
+    stdin_sh: sh
+    wait_line: waiting for connections
+  category: database
+  image: mongo
+  repo: mongo
+- bench_args:
+    stdin_sh: sh
+    wait_line: '] started'
+  category: database
+  image: elasticsearch
+  repo: elasticsearch
+- bench_args:
+    stdin_sh: sh
+    wait_line: Listening on
+  category: other
+  image: ghost
+  repo: ghost
+- bench_args:
+    stdin_sh: sh
+    wait_line: apache2 -D FOREGROUND
+  category: other
+  image: drupal
+  repo: drupal
+- bench_args:
+    stdin_sh: sh
+    wait_line: Jenkins is fully up and running
+  category: other
+  image: jenkins
+  repo: jenkins
+- bench_args:
+    stdin_sh: sh
+    wait_line: Process[web] is up
+  category: other
+  image: sonarqube
+  repo: sonarqube
+- bench_args:
+    stdin_sh: sh
+    wait_line: Server startup complete
+  category: other
+  image: rabbitmq
+  repo: rabbitmq
+- bench_args:
+    stdin_sh: sh
+    wait_line: httpd -D FOREGROUND
+  category: web-server
+  image: httpd
+  repo: httpd
+- bench_args:
+    stdin_sh: sh
+    wait_line: Running GlassFish
+  category: web-server
+  image: glassfish
+  repo: glassfish
+- bench_args:
+    stdin_sh: sh
+    wait_line: 'main: Started'
+  category: web-server
+  image: jetty
+  repo: jetty
+- bench_args:
+    stdin_sh: sh
+    wait_line: Zend Server started
+  category: web-server
+  image: php-zendserver
+  repo: php-zendserver
+- bench_args:
+    arg: catalina.sh run
+    stdin_sh: sh
+    wait_line: Server startup
+  category: web-server
+  image: tomcat
+  repo: tomcat
+CMD_STDIN:
+- bench_args:
+    stdin: php -r "echo \"hello\n\";"
+    stdin_sh: sh
+  category: language
+  image: php
+  repo: php
+- bench_args:
+    stdin: ruby -e "puts \"hello\""
+    stdin_sh: sh
+  category: language
+  image: ruby
+  repo: ruby
+- bench_args:
+    stdin: jruby -e "puts \"hello\""
+    stdin_sh: sh
+  category: language
+  image: jruby
+  repo: jruby
+- bench_args:
+    stdin: julia -e 'println("hello")'
+    stdin_sh: sh
+  category: language
+  image: julia
+  repo: julia
+- bench_args:
+    mount:
+    - container_path: /go/src
+      host_path: misc/mount/go
+    stdin: cd /go/src; go run main.go
+    stdin_sh: sh
+  category: language
+  image: golang
+  repo: golang
+- bench_args:
+    mount:
+    - container_path: /hello
+      host_path: misc/mount/clojure
+    stdin: cd /hello/hello; lein run
+    stdin_sh: sh
+  category: language
+  image: clojure
+  repo: clojure
+- bench_args:
+    stdin: '"hello"'
+    stdin_sh: null
+  category: language
+  image: haskell
+  repo: haskell
+- bench_args:
+    stdin: (print "hello")
+    stdin_sh: null
+  category: language
+  image: hylang
+  repo: hylang
+- bench_args:
+    mount:
+    - container_path: /src
+      host_path: misc/mount/java
+    stdin: cd /src; javac Main.java; java Main
+    stdin_sh: sh
+  category: language
+  image: java
+  repo: java
+- bench_args:
+    mount:
+    - container_path: /src
+      host_path: misc/mount/mono
+    stdin: cd /src; mcs main.cs; mono main.exe
+    stdin_sh: sh
+  category: language
+  image: mono
+  repo: mono
+- bench_args:
+    stdin: sprintf("hello")
+    stdin_sh: R --no-save
+  category: language
+  image: r-base
+  repo: r-base
+- bench_args:
+    mount:
+    - container_path: /src
+      host_path: misc/mount/gcc
+    stdin: cd /src; gcc main.c; ./a.out
+    stdin_sh: sh
+  category: language
+  image: gcc
+  repo: gcc
+- bench_args:
+    mount:
+    - container_path: /src
+      host_path: misc/mount/thrift
+    stdin: cd /src; thrift --gen py hello.idl
+    stdin_sh: sh
+  category: language
+  image: thrift
+  repo: thrift
+- bench_args:
+    stdin: sed -i "s/.cuda()//g" /benchmark/vision/test.py; sed -i "s/cuda/cpu/g"
+      /benchmark/vision/test.py; sed -i "/^  assert/d" /benchmark/vision/test.py;
+      sed -i "s/required=True/required=False/g" /benchmark/vision/test.py; sed -i
+      "s/20/1/g" /benchmark/vision/test.py; cd /benchmark; python /benchmark/vision/test.py
+    stdin_sh: sh
+  category: other
+  image: benchmark
+  repo: benchmark
+- bench_args:
+    stdin: django-admin startproject hello
+    stdin_sh: sh
+  category: web-framework
+  image: django
+  repo: django
+- bench_args:
+    stdin: rails new hello
+    stdin_sh: sh
+  category: web-framework
+  image: rails
+  repo: rails
+CMD_URL_WAIT:
+- bench_args:
+    envs:
+    - key: GUNICORN_OPTS
+      value: '["--preload"]'
+    stdin_sh: sh
+    wait_url: http://localhost:5000
+  category: other
+  image: registry
+  repo: registry
+- bench_args:
+    stdin_sh: sh
+    wait_url: http://localhost:80
+  category: web-server
+  image: nginx
+  repo: nginx
+- bench_args:
+    arg: node /src/index.js
+    mount:
+    - container_path: /src
+      host_path: misc/mount/node
+    stdin_sh: sh
+    wait_url: http://localhost:80
+  category: web-framework
+  image: node
+  repo: node
+- bench_args:
+    arg: iojs /src/index.js
+    mount:
+    - container_path: /src
+      host_path: misc/mount/iojs
+    stdin_sh: sh
+    wait_url: http://localhost:80
+  category: web-framework
+  image: iojs
+  repo: iojs
+ECHO_HELLO:
+- category: distro
+  image: alpine
+  repo: alpine
+- category: distro
+  image: busybox
+  repo: busybox
+- category: distro
+  image: crux
+  repo: crux
+- category: distro
+  image: cirros
+  repo: cirros
+- category: distro
+  image: debian
+  repo: debian
+- category: distro
+  image: ubuntu
+  repo: ubuntu
+- category: distro
+  image: ubuntu-upstart
+  repo: ubuntu-upstart
+- category: distro
+  image: ubuntu-debootstrap
+  repo: ubuntu-debootstrap
+- category: distro
+  image: centos
+  repo: centos
+- category: distro
+  image: fedora
+  repo: fedora
+- category: distro
+  image: opensuse
+  repo: opensuse
+- category: distro
+  image: oraclelinux
+  repo: oraclelinux
+- category: distro
+  image: mageia
+  repo: mageia

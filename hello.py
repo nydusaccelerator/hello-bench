@@ -267,80 +267,85 @@ class BenchRunner:
 
         echo_hello_runner = set()
         echo_hello = dict()
-        for line in data["ECHO_HELLO"]:
-            name = line["image"]
-            echo_hello_runner.add(name)
-            echo_hello[name] = Bench(name, line["category"])
+        if "ECHO_HELLO" in data:
+            for line in data["ECHO_HELLO"]:
+                name = line["image"]
+                echo_hello_runner.add(name)
+                echo_hello[name] = Bench(name, line["category"])
 
         cmd_arg_wait_runner = dict()
         cmd_arg_wait = dict()
-        for line in data["CMD_ARG_WAIT"]:
-            name = line["image"]
-            args = line["bench_args"]
-            print(f"CMD_ARG_WAIT image: {name}, args: {args}")
-            cmd_arg_wait_runner[name] = RunArgs(
-                env=args["envs"] if "envs" in args else {},
-                waitline=args["wait_line"] if "wait_line" in args else "",
-                mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
-                if "mount" in args
-                else [],
-                arg=args["arg"] if "arg" in args else "",
-                stdin=args["stdin"] if "stdin" in args else "",
-                stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
-            )
-            cmd_arg_wait[name] = Bench(name, line["category"])
+        if "CMD_ARG_WAIT" in data:
+            for line in data["CMD_ARG_WAIT"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_ARG_WAIT image: {name}, args: {args}")
+                cmd_arg_wait_runner[name] = RunArgs(
+                    env=args["envs"] if "envs" in args else {},
+                    waitline=args["wait_line"] if "wait_line" in args else "",
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                )
+                cmd_arg_wait[name] = Bench(name, line["category"])
 
         cmd_stdin_runner = dict()
         cmd_stdin = dict()
-        for line in data["CMD_STDIN"]:
-            name = line["image"]
-            args = line["bench_args"]
-            print(f"CMD_STDIN image: {name}, args: {args}")
-            cmd_stdin_runner[name] = RunArgs(
-                env=args["envs"] if "envs" in args else {},
-                mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
-                if "mount" in args
-                else [],
-                arg=args["arg"] if "arg" in args else "",
-                stdin=args["stdin"] if "stdin" in args else "",
-                stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
-            )
-            cmd_stdin[name] = Bench(name, line["category"])
+        if "CMD_STDIN" in data:
+            for line in data["CMD_STDIN"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_STDIN image: {name}, args: {args}")
+                cmd_stdin_runner[name] = RunArgs(
+                    env=args["envs"] if "envs" in args else {},
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                )
+                cmd_stdin[name] = Bench(name, line["category"])
 
         cmd_arg_runner = dict()
         cmd_arg = dict()
-        for line in data["CMD_ARG"]:
-            name = line["image"]
-            args = line["bench_args"]
-            print(f"CMD_ARG image: {name}, args: {args}")
-            cmd_arg_runner[name] = RunArgs(
-                env=args["envs"] if "envs" in args else {},
-                mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
-                if "mount" in args
-                else [],
-                arg=args["arg"] if "arg" in args else "",
-                stdin=args["stdin"] if "stdin" in args else "",
-                stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
-            )
-            cmd_arg[name] = Bench(name, line["category"])
+        if "CMD_ARG" in data:
+            for line in data["CMD_ARG"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_ARG image: {name}, args: {args}")
+                cmd_arg_runner[name] = RunArgs(
+                    env=args["envs"] if "envs" in args else {},
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                )
+                cmd_arg[name] = Bench(name, line["category"])
 
         cmd_url_wait_runner = dict()
         cmd_url_wait = dict()
-        for line in data["CMD_URL_WAIT"]:
-            name = line["image"]
-            args = line["bench_args"]
-            print(f"CMD_URL_WAIT image: {name}, args: {args}")
-            cmd_url_wait_runner[name] = RunArgs(
-                env=args["envs"] if "envs" in args else {},
-                waitURL=args["wait_url"] if "wait_url" in args else "",
-                mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
-                if "mount" in args
-                else [],
-                arg=args["arg"] if "arg" in args else "",
-                stdin=args["stdin"] if "stdin" in args else "",
-                stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
-            )
-            cmd_url_wait[name] = Bench(name, line["category"])
+        if "CMD_URL_WAIT" in data:
+            for line in data["CMD_URL_WAIT"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_URL_WAIT image: {name}, args: {args}")
+                cmd_url_wait_runner[name] = RunArgs(
+                    env=args["envs"] if "envs" in args else {},
+                    waitURL=args["wait_url"] if "wait_url" in args else "",
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                )
+                cmd_url_wait[name] = Bench(name, line["category"])
 
         all = {**echo_hello, **cmd_arg_wait, **cmd_stdin, **cmd_arg, **cmd_url_wait}
         print([name for name in all.keys()])
