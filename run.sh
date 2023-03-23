@@ -16,6 +16,7 @@ RESULT_FILE=result.txt
 RESULT_CSV=result.csv
 NYDUSIFY_BIN=$(which nydusify)
 NYDUS_IMAGE_BIN=$(which nydus-image)
+BENCH_CONFIG=bench.yaml
 
 #########################################################
 # Could alert value via arguments
@@ -25,7 +26,7 @@ RESULT_DIR=data
 SOURCE_REGISTRY=docker.io/library
 TARGET_REGISTRY=""
 SKIP=false
-IMAGES_PATH=hello_bench_image_list.txt
+IMAGES_PATH=image_list.txt
 
 #########################################################
 # Push OCI image to TARGET_REGISTRY
@@ -62,18 +63,24 @@ function convert() {
 
     image=$1
 
+    name=$(echo ${image} | awk -F: '{print $1}')
+    tag=$(echo ${image} | awk -F: '{print $2}')
+    if [[ "${tag}" == "" ]];then
+        tag=latest
+    fi
+
     sudo nerdctl pull ${TARGET_REGISTRY}/${image}
-    echo "[INFO] Converting ${TARGET_REGISTRY}/${image} to ${TARGET_REGISTRY}/${image}:nydusv6 ..."
+    echo "[INFO] Converting ${TARGET_REGISTRY}/${image} to ${TARGET_REGISTRY}/${name}:${tag}-nydusv6 ..."
     echo "sudo $NYDUSIFY_BIN convert \
         --fs-version 6 \
         --nydus-image $NYDUS_IMAGE_BIN \
         --source ${TARGET_REGISTRY}/${image} \
-        --target ${TARGET_REGISTRY}/${image}:nydusv6"
+        --target ${TARGET_REGISTRY}/${name}:${tag}-nydusv6"
     sudo $NYDUSIFY_BIN convert \
         --fs-version 6 \
         --nydus-image $NYDUS_IMAGE_BIN \
         --source ${TARGET_REGISTRY}/${image} \
-        --target ${TARGET_REGISTRY}/${image}:nydusv6
+        --target ${TARGET_REGISTRY}/${name}:${tag}-nydusv6
 }
 
 #########################################################
@@ -112,6 +119,12 @@ function stop_all_containers {
 function run() {
     image=$1
 
+    name=$(echo ${image} | awk -F: '{print $1}')
+    tag=$(echo ${image} | awk -F: '{print $2}')
+    if [[ "${tag}" == "" ]];then
+        tag=latest
+    fi
+
     stop_all_containers
     sudo nerdctl ps -a | awk 'NR>1 {print $1}' | xargs sudo nerdctl rm >/dev/null 2>&1
     sudo nerdctl container prune -f
@@ -121,7 +134,7 @@ function run() {
 
     echo "[INFO] Run hello bench in ${image} ..."
     sudo nerdctl --snapshotter overlayfs rmi -f ${TARGET_REGISTRY}/${image} >/dev/null 2>&1
-    result=$(sudo ./hello.py --engine nerdctl --snapshotter overlayfs --op run \
+    result=$(sudo ./hello.py --bench-config=${BENCH_CONFIG} --engine nerdctl --snapshotter overlayfs --op run \
         --registry=${TARGET_REGISTRY} \
         --images ${image} |
         grep "repo")
@@ -130,16 +143,16 @@ function run() {
     echo "[INFO] Remove image ${TARGET_REGISTRY}/${image} ..."
     sudo nerdctl --snapshotter overlayfs rmi -f ${TARGET_REGISTRY}/${image} >/dev/null 2>&1
 
-    echo "[INFO] Run hello bench in ${image}:nydusv6 ..."
-    sudo nerdctl --snapshotter nydus rmi -f ${TARGET_REGISTRY}/${image}:nydusv6 >/dev/null 2>&1
-    result=$(sudo ./hello.py --engine nerdctl --snapshotter nydus --op run \
+    echo "[INFO] Run hello bench in ${name}:${tag}-nydusv6 ..."
+    sudo nerdctl --snapshotter nydus rmi -f ${TARGET_REGISTRY}/${name}:${tag}-nydusv6 >/dev/null 2>&1
+    result=$(sudo ./hello.py --bench-config=${BENCH_CONFIG} --engine nerdctl --snapshotter nydus --op run \
         --registry=${TARGET_REGISTRY} \
-        --images ${image}:nydusv6 |
+        --images ${name}:${tag}-nydusv6 |
         grep "repo")
     echo ${result}
     echo ${result} >>${RESULT_DIR}/${RESULT_FILE}.${CURRENT_ROUND}
-    echo "[INFO] Remove image ${TARGET_REGISTRY}/${image}:nydusv6 ..."
-    sudo nerdctl --snapshotter nydus rmi -f ${TARGET_REGISTRY}/${image}:nydusv6 >/dev/null 2>&1
+    echo "[INFO] Remove image ${TARGET_REGISTRY}/${name}:${tag}-nydusv6 ..."
+    sudo nerdctl --snapshotter nydus rmi -f ${TARGET_REGISTRY}/${name}:${tag}-nydusv6 >/dev/null 2>&1
 }
 
 #########################################################
@@ -219,6 +232,7 @@ function usage() {
     echo "Usage:"
     echo -e "run.sh -o OPERATION -s SOURCE_REGISTRY -t TARGET_REGISTRY [other options]
 [-o operation]          \tavailable options are [ push convert run all draw ]
+[-c config]             \tbench config file (only available for \"run\" operation)
 [-i images]             \timages list
 [-p images path]        \tfile path that contains images list (line by line)
 [-s source registry]    \tsource registry for pulling image
@@ -243,7 +257,7 @@ if [ $# -eq 0 ]; then
     usage
 fi
 
-while getopts o:i:p:s:t:r:d:kh OPT; do
+while getopts o:c:i:p:s:t:r:d:k:h OPT; do
     case $OPT in
     o)
         operation=${OPTARG}
@@ -252,6 +266,9 @@ while getopts o:i:p:s:t:r:d:kh OPT; do
             exit
         fi
 
+        ;;
+    c)
+        BENCH_CONFIG=${OPTARG}
         ;;
     i)
         getopts_extra "$@"
