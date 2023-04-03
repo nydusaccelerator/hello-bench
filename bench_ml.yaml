@@ -3,6 +3,17 @@ CMD_ARG:
     envs:
     - key: NVIDIA_VISIBLE_DEVICES
       value: 'all'
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+  category: machine-learning
+  image: chat-bench
+  repo: ml_platform
+
+CMD_ARG_WAIT:
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
     arg: ./test.sh
     stdin_sh: sh
     mount:
@@ -11,6 +22,7 @@ CMD_ARG:
     runtime: nvidia-container-runtime
     shm_size: 8gb
     work_dir: /pytorch
+    wait_line: 'benchmark end'
   category: machine-learning
   image: pytorch
   repo: ml_platform
@@ -26,17 +38,9 @@ CMD_ARG:
     runtime: nvidia-container-runtime
     shm_size: 8gb
     work_dir: /tf_cnn_benchmarks
+    wait_line: 'total images'
   category: machine-learning
   image: tensorflow
-  repo: ml_platform
-- bench_args:
-    envs:
-    - key: NVIDIA_VISIBLE_DEVICES
-      value: 'all'
-    runtime: nvidia-container-runtime
-    shm_size: 8gb
-  category: machine-learning
-  image: chat-bench
   repo: ml_platform
 
 CMD_URL_WAIT:
