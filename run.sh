@@ -99,10 +99,12 @@ function stop_all_containers {
     else
         echo "Killing containers ${containers}"
         for C in ${containers}; do
-            sudo nerdctl kill "${C}"
-            sudo nerdctl stop "${C}"
-            sudo nerdctl rm "${C}"
+            sudo nerdctl kill "${C}" >/dev/null 2>&1
+            sudo nerdctl stop "${C}" >/dev/null 2>&1
+            sudo nerdctl rm -f "${C}" >/dev/null 2>&1
         done
+        sudo nerdctl ps -a
+        sudo nerdctl images
         return 1
     fi
 }
@@ -127,9 +129,12 @@ function run() {
 
     stop_all_containers
     sudo nerdctl ps -a | awk 'NR>1 {print $1}' | xargs sudo nerdctl rm >/dev/null 2>&1
-    sudo nerdctl container prune -f
-    sudo nerdctl image prune -f --all
-    sudo systemctl restart nydus-snapshotter
+    sudo nerdctl container prune -f >/dev/null 2>&1
+    sudo nerdctl image prune --all -f >/dev/null 2>&1
+    sudo nerdctl system prune --all -f --volumes >/dev/null 2>&1
+    sudo ctr images ls | awk 'NR>1 {print $1}' | xargs sudo ctr images rm --sync >/dev/null 2>&1
+    sudo ctr leases ls | awk 'NR>1 {print $1}' | xargs sudo ctr leases rm --sync >/dev/null 2>&1
+    sudo ctr content prune references >/dev/null 2>&1
     sleep 1
 
     echo "[INFO] Run hello bench in ${image} ..."
@@ -137,7 +142,7 @@ function run() {
     result=$(sudo ./hello.py --bench-config=${BENCH_CONFIG} --engine nerdctl --snapshotter overlayfs --op run \
         --registry=${TARGET_REGISTRY} \
         --images ${image} |
-        grep "repo")
+        grep "repo" | grep "bench" | grep "timestamp")
     echo ${result}
     echo ${result} >>${RESULT_DIR}/${RESULT_FILE}.${CURRENT_ROUND}
     echo "[INFO] Remove image ${TARGET_REGISTRY}/${image} ..."
@@ -148,7 +153,7 @@ function run() {
     result=$(sudo ./hello.py --bench-config=${BENCH_CONFIG} --engine nerdctl --snapshotter nydus --op run \
         --registry=${TARGET_REGISTRY} \
         --images ${name}:${tag}-nydusv6 |
-        grep "repo")
+        grep "repo" | grep "bench" | grep "timestamp")
     echo ${result}
     echo ${result} >>${RESULT_DIR}/${RESULT_FILE}.${CURRENT_ROUND}
     echo "[INFO] Remove image ${TARGET_REGISTRY}/${name}:${tag}-nydusv6 ..."

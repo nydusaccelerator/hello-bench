@@ -132,7 +132,7 @@ def timer(cmd):
 
 class RunArgs:
     def __init__(
-        self, env={}, arg="", stdin="", stdin_sh="sh", waitline="", mount=[], waitURL=""
+        self, env={}, arg="", stdin="", stdin_sh="sh", waitline="", mount=[], waitURL="", runtime="", shmSize="", workDir=""
     ):
         self.env = env
         self.arg = arg
@@ -141,6 +141,9 @@ class RunArgs:
         self.waitline = waitline
         self.mount = mount
         self.waitURL = waitURL
+        self.runtime = runtime
+        self.shmSize = shmSize
+        self.workDir = workDir
 
 
 class Docker:
@@ -281,7 +284,7 @@ class BenchRunner:
                 args = line["bench_args"]
                 print(f"CMD_ARG_WAIT image: {name}, args: {args}")
                 cmd_arg_wait_runner[name] = RunArgs(
-                    env=args["envs"] if "envs" in args else {},
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]]) if "envs" in args else {},
                     waitline=args["wait_line"] if "wait_line" in args else "",
                     mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
                     if "mount" in args
@@ -289,6 +292,9 @@ class BenchRunner:
                     arg=args["arg"] if "arg" in args else "",
                     stdin=args["stdin"] if "stdin" in args else "",
                     stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
                 )
                 cmd_arg_wait[name] = Bench(name, line["category"])
 
@@ -300,13 +306,16 @@ class BenchRunner:
                 args = line["bench_args"]
                 print(f"CMD_STDIN image: {name}, args: {args}")
                 cmd_stdin_runner[name] = RunArgs(
-                    env=args["envs"] if "envs" in args else {},
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]]) if "envs" in args else {},
                     mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
                     if "mount" in args
                     else [],
                     arg=args["arg"] if "arg" in args else "",
                     stdin=args["stdin"] if "stdin" in args else "",
                     stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
                 )
                 cmd_stdin[name] = Bench(name, line["category"])
 
@@ -318,13 +327,16 @@ class BenchRunner:
                 args = line["bench_args"]
                 print(f"CMD_ARG image: {name}, args: {args}")
                 cmd_arg_runner[name] = RunArgs(
-                    env=args["envs"] if "envs" in args else {},
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]]) if "envs" in args else {},
                     mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
                     if "mount" in args
                     else [],
                     arg=args["arg"] if "arg" in args else "",
                     stdin=args["stdin"] if "stdin" in args else "",
                     stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
                 )
                 cmd_arg[name] = Bench(name, line["category"])
 
@@ -336,7 +348,7 @@ class BenchRunner:
                 args = line["bench_args"]
                 print(f"CMD_URL_WAIT image: {name}, args: {args}")
                 cmd_url_wait_runner[name] = RunArgs(
-                    env=args["envs"] if "envs" in args else {},
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]]) if "envs" in args else {},
                     waitURL=args["wait_url"] if "wait_url" in args else "",
                     mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
                     if "mount" in args
@@ -344,6 +356,9 @@ class BenchRunner:
                     arg=args["arg"] if "arg" in args else "",
                     stdin=args["stdin"] if "stdin" in args else "",
                     stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
                 )
                 cmd_url_wait[name] = Bench(name, line["category"])
 
@@ -391,8 +406,6 @@ class BenchRunner:
         return pull_elapsed, create_elapsed, run_elapsed
 
     def run_cmd_arg(self, repo, runargs):
-        assert len(runargs.mount) == 0
-
         image_ref = self.image_ref(repo)
         container_name = repo.replace(":", "-") + random_chars()
 
@@ -593,7 +606,21 @@ class BenchRunner:
         return f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} -- echo hello"
 
     def create_cmd_arg_cmd(self, image_ref, container_id, runargs):
-        cmd = f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} "
+        cmd = f"nerdctl --snapshotter {self.snapshotter} create --net=host "
+        if len(runargs.env) > 0:
+            env = " ".join(["--env %s=%s" % (k, v) for k, v in runargs.env.items()])
+            cmd += f" {env} "
+        for a, b in runargs.mount:
+            a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
+            a = tmp_copy(a)
+            cmd += f"--volume {a}:{b} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
+        cmd += f"--name={container_id} {image_ref} "
         return cmd + runargs.arg
 
     def create_cmd_arg_wait_cmd(self, image_ref, container_id, runargs):
@@ -605,9 +632,15 @@ class BenchRunner:
             a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
             a = tmp_copy(a)
             cmd += f"--volume {a}:{b} "
-        cmd += f"--name={container_id} {image_ref}"
+        cmd += f"--name={container_id} {image_ref} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
         if len(runargs.arg) > 0:
-            cmd += f" -- {runargs.arg} "
+            cmd += f"{runargs.arg} "
 
         return cmd
 
@@ -617,9 +650,15 @@ class BenchRunner:
             a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
             a = tmp_copy(a)
             cmd += f"--volume {a}:{b} "
-        cmd += f"--name={container_id} {image_ref}"
+        cmd += f"--name={container_id} {image_ref} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
         if runargs.stdin_sh:
-            cmd += f" -- {runargs.stdin_sh}"  # e.g., sh -c
+            cmd += f"-- {runargs.stdin_sh}"  # e.g., sh -c
         return cmd
 
     def create_cmd_url_wait_cmd(self, image_ref, container_id, runargs):
@@ -631,9 +670,15 @@ class BenchRunner:
         if len(runargs.env) > 0:
             env = " ".join([f"--env {k}={v}" for k, v in runargs.env.items()])
             cmd += f" {env} "
-        cmd += f"--name={container_id} {image_ref}"
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
+        cmd += f"--name={container_id} {image_ref} "
         if len(runargs.arg) > 0:
-            cmd += f" -- {runargs.arg} "
+            cmd += f"{runargs.arg} "
         return cmd
 
     def task_start_cmd(self, container_id, iteration: bool):

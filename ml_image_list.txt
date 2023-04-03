@@ -1,0 +1,5 @@
+tritonserver:23.02-py3
+pytorch:1.11_cu115
+pytorch:1.11_cu113
+tensorflow:2.4
+chat-bench:2.0_cu117
