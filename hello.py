@@ -422,7 +422,7 @@ class BenchRunner:
         with timer(create_cmd) as t:
             create_elapsed = t
 
-        run_cmd = self.task_start_cmd(container_name, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
         print("Running container %s ..." % container_name)
@@ -453,7 +453,7 @@ class BenchRunner:
         with timer(create_cmd) as t:
             create_elapsed = t
 
-        run_cmd = self.task_start_cmd(container_name, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
         with timer(run_cmd) as t:
