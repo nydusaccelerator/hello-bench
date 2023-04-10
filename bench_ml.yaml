@@ -42,6 +42,21 @@ CMD_ARG_WAIT:
   category: machine-learning
   image: tensorflow
   repo: ml_platform
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    arg: /opt/ml-platform/ddp.sh --num-iters 1000
+    stdin_sh: sh
+    mount:
+    - container_path: /tf_cnn_benchmarks
+      host_path: misc/mount/tf_cnn_benchmarks
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+    wait_line: 'Img/sec'
+  category: machine-learning
+  image: tensorflow
+  repo: ml_platform
 
 CMD_URL_WAIT:
 - bench_args:
