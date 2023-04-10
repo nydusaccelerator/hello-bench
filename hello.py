@@ -640,6 +640,7 @@ class BenchRunner:
 
     def image_size(self, image_ref):
         cmd = f"nerdctl images {str(image_ref)}"
+        print(cmd)
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
         out = p.communicate()[0].decode("utf-8")
         return " ".join(out.split()[-2:])
