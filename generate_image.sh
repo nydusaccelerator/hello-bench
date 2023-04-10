@@ -223,7 +223,7 @@ function large_base_image_random_files() {
     fi
 
     file_number=(1 2 4)
-    file_size=(1 2 4 8)
+    file_size=(1 2 4)
     for number in ${file_number[@]}; do
         for size in ${file_size[@]}; do
             dir=${tmpdir}/dir_number${number}_size${size}
@@ -268,7 +268,7 @@ function large_base_image_random_files() {
                     fileplayer=$((${image_file_number} / ${layer}))
                     echo "image_file_number: ${image_file_number}, layer: ${layer}, fileplayer: ${fileplayer}"
 
-                    image_name=base-n${number}-s${size}:f${image_file_number}-l${layer}
+                    image_name=base-n${number}-s${size}-f${image_file_number}-l${layer}
                     image=${registry}/${image_name}
                     for j in $(cat ${image_list}); do
                         if [[ "${i}" == "${image}" ]]; then
@@ -337,7 +337,7 @@ function generate_bench_yaml() {
         if [[ "${tag}" == "" ]]; then
             tag=latest
         fi
-        sed -i "s/^  REPLACE_ME/- bench_args:\n    wait_line: 'Read file list done'\n  category: test\n  image: ${name}\n  repo: ${repo}\n  REPLACE_ME/g" ${target_bench_yaml}
+        sed -i "s/^  REPLACE_ME/- bench_args:\n    wait_line: 'Read file list done'\n    arg: seq \/file_list_path_shuffed.txt\n  category: test\n  image: ${name}\n  repo: ${repo}\n  REPLACE_ME/g" ${target_bench_yaml}
     done
     sed -i "/REPLACE_ME/d" ${target_bench_yaml}
 }
