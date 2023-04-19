@@ -1,0 +1,4 @@
+tritonserver:23.02-py3
+pytorch:1.11_cu115
+pytorch-ddp:1.12.1
+tensorflow:2.4

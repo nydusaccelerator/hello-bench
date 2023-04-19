@@ -30,11 +30,8 @@ import string
 from argparse import ArgumentParser
 from datetime import datetime
 from contextlib import contextmanager
+import yaml
 
-NGINX_PORT = 20000
-IOJS_PORT = 20001
-NODE_PORT = 20002
-REGISTRY_PORT = 20003
 TMP_DIR = tempfile.mkdtemp()
 
 
@@ -135,7 +132,17 @@ def timer(cmd):
 
 class RunArgs:
     def __init__(
-        self, env={}, arg="", stdin="", stdin_sh="sh", waitline="", mount=[], waitURL=""
+        self,
+        env={},
+        arg="",
+        stdin="",
+        stdin_sh="sh",
+        waitline="",
+        mount=[],
+        waitURL="",
+        runtime="",
+        shmSize="",
+        workDir="",
     ):
         self.env = env
         self.arg = arg
@@ -144,6 +151,9 @@ class RunArgs:
         self.waitline = waitline
         self.mount = mount
         self.waitURL = waitURL
+        self.runtime = runtime
+        self.shmSize = shmSize
+        self.workDir = workDir
 
 
 class Docker:
@@ -235,178 +245,15 @@ class Bench:
         self.name = f"{self.name}:{tag}"
 
 
+class BenchResult:
+    def __init__(self, pull_elapsed, create_elapsed, run_elapsed, size):
+        self.pull_elapsed = pull_elapsed
+        self.create_elapsed = create_elapsed
+        self.run_elapsed = run_elapsed
+        self.size = size
+
+
 class BenchRunner:
-    ECHO_HELLO = set(
-        [
-            "alpine",
-            "busybox",
-            "crux",
-            "cirros",
-            "debian",
-            "ubuntu",
-            "ubuntu-upstart",
-            "ubuntu-debootstrap",
-            "centos",
-            "fedora",
-            "opensuse",
-            "oraclelinux",
-            "mageia",
-        ]
-    )
-
-    CMD_ARG_WAIT = {
-        "mysql": RunArgs(
-            env={"MYSQL_ROOT_PASSWORD": "abc"}, waitline="mysqld: ready for connections"
-        ),
-        "percona": RunArgs(
-            env={"MYSQL_ROOT_PASSWORD": "abc"}, waitline="mysqld: ready for connections"
-        ),
-        "mariadb": RunArgs(
-            env={"MYSQL_ROOT_PASSWORD": "abc"},
-            waitline="mariadbd: ready for connections",
-        ),
-        "postgres": RunArgs(waitline="database system is ready to accept connections"),
-        "redis": RunArgs(waitline="Ready to accept connections"),
-        "crate": RunArgs(waitline="started"),
-        "rethinkdb": RunArgs(waitline="Server ready"),
-        "ghost": RunArgs(waitline="Listening on"),
-        "glassfish": RunArgs(waitline="Running GlassFish"),
-        "drupal": RunArgs(waitline="apache2 -D FOREGROUND"),
-        "elasticsearch": RunArgs(waitline="] started"),
-        "cassandra": RunArgs(waitline="Listening for thrift clients"),
-        "httpd": RunArgs(waitline="httpd -D FOREGROUND"),
-        "jenkins": RunArgs(waitline="Jenkins is fully up and running"),
-        "jetty": RunArgs(waitline="main: Started"),
-        "mongo": RunArgs(waitline="waiting for connections"),
-        "php-zendserver": RunArgs(waitline="Zend Server started"),
-        "rabbitmq": RunArgs(waitline="Server startup complete"),
-        "sonarqube": RunArgs(waitline="Process[web] is up"),
-        "tomcat": RunArgs(arg="catalina.sh run", waitline="Server startup"),
-    }
-
-    CMD_STDIN = {
-        "php": RunArgs(stdin='php -r "echo \\"hello\\n\\";"'),
-        "ruby": RunArgs(stdin='ruby -e "puts \\"hello\\""'),
-        "jruby": RunArgs(stdin='jruby -e "puts \\"hello\\""'),
-        "julia": RunArgs(stdin="julia -e 'println(\"hello\")'"),
-        "gcc": RunArgs(stdin="cd /src; gcc main.c; ./a.out", mount=[("gcc", "/src")]),
-        "golang": RunArgs(
-            stdin="cd /go/src; go run main.go", mount=[("go", "/go/src")]
-        ),
-        "clojure": RunArgs(
-            stdin="cd /hello/hello; lein run", mount=[("clojure", "/hello")]
-        ),
-        "django": RunArgs(stdin="django-admin startproject hello"),
-        "rails": RunArgs(stdin="rails new hello"),
-        "haskell": RunArgs(stdin='"hello"', stdin_sh=None),
-        "hylang": RunArgs(stdin='(print "hello")', stdin_sh=None),
-        "java": RunArgs(
-            stdin="cd /src; javac Main.java; java Main", mount=[("java", "/src")]
-        ),
-        "mono": RunArgs(
-            stdin="cd /src; mcs main.cs; mono main.exe", mount=[("mono", "/src")]
-        ),
-        "r-base": RunArgs(stdin='sprintf("hello")', stdin_sh="R --no-save"),
-        "thrift": RunArgs(
-            stdin="cd /src; thrift --gen py hello.idl", mount=[("thrift", "/src")]
-        ),
-        "benchmark": RunArgs(
-            stdin='sed -i "s/.cuda()//g" /benchmark/vision/test.py; sed -i "s/cuda/cpu/g" /benchmark/vision/test.py; sed -i "/^  assert/d" /benchmark/vision/test.py; sed -i "s/required=True/required=False/g" /benchmark/vision/test.py; sed -i "s/20/1/g" /benchmark/vision/test.py; cd /benchmark; python /benchmark/vision/test.py'
-        ),
-    }
-
-    CMD_ARG = {
-        "perl": RunArgs(arg="perl -e 'print(\"hello\\n\")'"),
-        "rakudo-star": RunArgs(arg="perl6 -e 'print(\"hello\\n\")'"),
-        "pypy": RunArgs(arg="pypy3 -c 'print(\"hello\")'"),
-        "python": RunArgs(arg="python -c 'print(\"hello\")'"),
-        "hello-world": RunArgs(),
-    }
-
-    CMD_URL_WAIT = {
-        "nginx": RunArgs(waitURL="http://localhost:80"),
-        "iojs": RunArgs(
-            arg="iojs /src/index.js",
-            mount=[("iojs", "/src")],
-            waitURL="http://localhost:80",
-        ),
-        "node": RunArgs(
-            arg="node /src/index.js",
-            mount=[("node", "/src")],
-            waitURL="http://localhost:80",
-        ),
-        "registry": RunArgs(
-            env={"GUNICORN_OPTS": '["--preload"]'}, waitURL="http://localhost:5000"
-        ),
-    }
-
-    # complete listing
-    ALL = dict(
-        [
-            (b.name, b)
-            for b in [
-                Bench("alpine", "distro"),
-                Bench("busybox", "distro"),
-                Bench("crux", "distro"),
-                Bench("cirros", "distro"),
-                Bench("debian", "distro"),
-                Bench("ubuntu", "distro"),
-                Bench("ubuntu-upstart", "distro"),
-                Bench("ubuntu-debootstrap", "distro"),
-                Bench("centos", "distro"),
-                Bench("fedora", "distro"),
-                Bench("opensuse", "distro"),
-                Bench("oraclelinux", "distro"),
-                Bench("mageia", "distro"),
-                Bench("mysql", "database"),
-                Bench("percona", "database"),
-                Bench("mariadb", "database"),
-                Bench("postgres", "database"),
-                Bench("redis", "database"),
-                Bench("crate", "database"),
-                Bench("rethinkdb", "database"),
-                Bench("php", "language"),
-                Bench("ruby", "language"),
-                Bench("jruby", "language"),
-                Bench("julia", "language"),
-                Bench("perl", "language"),
-                Bench("rakudo-star", "language"),
-                Bench("pypy", "language"),
-                Bench("python", "language"),
-                Bench("golang", "language"),
-                Bench("clojure", "language"),
-                Bench("haskell", "language"),
-                Bench("hylang", "language"),
-                Bench("java", "language"),
-                Bench("mono", "language"),
-                Bench("r-base", "language"),
-                Bench("gcc", "language"),
-                Bench("thrift", "language"),
-                Bench("benchmark"),
-                Bench("cassandra", "database"),
-                Bench("mongo", "database"),
-                Bench("elasticsearch", "database"),
-                Bench("hello-world"),
-                Bench("ghost"),
-                Bench("drupal"),
-                Bench("jenkins"),
-                Bench("sonarqube"),
-                Bench("rabbitmq"),
-                Bench("registry"),
-                Bench("httpd", "web-server"),
-                Bench("nginx", "web-server"),
-                Bench("glassfish", "web-server"),
-                Bench("jetty", "web-server"),
-                Bench("php-zendserver", "web-server"),
-                Bench("tomcat", "web-server"),
-                Bench("django", "web-framework"),
-                Bench("rails", "web-framework"),
-                Bench("node", "web-framework"),
-                Bench("iojs", "web-framework"),
-            ]
-        ]
-    )
-
     def __init__(
         self,
         docker="docker",
@@ -415,6 +262,7 @@ class BenchRunner:
         snapshotter="overlayfs",
         cleanup=True,
         insecure_registry=False,
+        bench_config="bench.yaml",
     ):
         self.registry = registry
         if self.registry != "":
@@ -430,6 +278,126 @@ class BenchRunner:
         if "nerdctl" == docker:
             self.docker.set_snapshotter(snapshotter)
         self.cleanup = cleanup
+        self.bench_config = bench_config
+
+    def load_bench_config(self):
+        bench_config = self.bench_config
+        print(f"Loading bench configuration from {bench_config}...")
+        with open(bench_config, "r") as stream:
+            data = yaml.safe_load(stream)
+
+        echo_hello_runner = set()
+        echo_hello = dict()
+        if "ECHO_HELLO" in data:
+            for line in data["ECHO_HELLO"]:
+                name = line["image"]
+                echo_hello_runner.add(name)
+                echo_hello[name] = Bench(name, line["category"])
+
+        cmd_arg_wait_runner = dict()
+        cmd_arg_wait = dict()
+        if "CMD_ARG_WAIT" in data:
+            for line in data["CMD_ARG_WAIT"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_ARG_WAIT image: {name}, args: {args}")
+                cmd_arg_wait_runner[name] = RunArgs(
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]])
+                    if "envs" in args
+                    else {},
+                    waitline=args["wait_line"] if "wait_line" in args else "",
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
+                )
+                cmd_arg_wait[name] = Bench(name, line["category"])
+
+        cmd_stdin_runner = dict()
+        cmd_stdin = dict()
+        if "CMD_STDIN" in data:
+            for line in data["CMD_STDIN"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_STDIN image: {name}, args: {args}")
+                cmd_stdin_runner[name] = RunArgs(
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]])
+                    if "envs" in args
+                    else {},
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
+                )
+                cmd_stdin[name] = Bench(name, line["category"])
+
+        cmd_arg_runner = dict()
+        cmd_arg = dict()
+        if "CMD_ARG" in data:
+            for line in data["CMD_ARG"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_ARG image: {name}, args: {args}")
+                cmd_arg_runner[name] = RunArgs(
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]])
+                    if "envs" in args
+                    else {},
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
+                )
+                cmd_arg[name] = Bench(name, line["category"])
+
+        cmd_url_wait_runner = dict()
+        cmd_url_wait = dict()
+        if "CMD_URL_WAIT" in data:
+            for line in data["CMD_URL_WAIT"]:
+                name = line["image"]
+                args = line["bench_args"]
+                print(f"CMD_URL_WAIT image: {name}, args: {args}")
+                cmd_url_wait_runner[name] = RunArgs(
+                    env=dict([(item["key"], item["value"]) for item in args["envs"]])
+                    if "envs" in args
+                    else {},
+                    waitURL=args["wait_url"] if "wait_url" in args else "",
+                    mount=[(m["host_path"], m["container_path"]) for m in args["mount"]]
+                    if "mount" in args
+                    else [],
+                    arg=args["arg"] if "arg" in args else "",
+                    stdin=args["stdin"] if "stdin" in args else "",
+                    stdin_sh=args["stdin_sh"] if "stdin_sh" in args else "",
+                    runtime=args["runtime"] if "runtime" in args else "",
+                    shmSize=args["shm_size"] if "shm_size" in args else "",
+                    workDir=args["work_dir"] if "work_dir" in args else "",
+                )
+                cmd_url_wait[name] = Bench(name, line["category"])
+
+        all = {**echo_hello, **cmd_arg_wait, **cmd_stdin, **cmd_arg, **cmd_url_wait}
+        print([name for name in all.keys()])
+
+        self.ECHO_HELLO = echo_hello_runner
+        self.CMD_ARG_WAIT = cmd_arg_wait_runner
+        self.CMD_STDIN = cmd_stdin_runner
+        self.CMD_ARG = cmd_arg_runner
+        self.CMD_URL_WAIT = cmd_url_wait_runner
+
+        self.ALL = all
 
     def image_ref(self, repo):
         return posixpath.join(self.registry, repo)
@@ -445,6 +413,8 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_elapsed = t
 
+        size = self.image_size(image_ref)
+
         create_cmd = self.create_echo_hello_cmd(image_ref, container_name)
         print(create_cmd)
 
@@ -452,7 +422,7 @@ class BenchRunner:
         with timer(create_cmd) as t:
             create_elapsed = t
 
-        run_cmd = self.task_start_cmd(container_name, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
         print("Running container %s ..." % container_name)
@@ -461,11 +431,9 @@ class BenchRunner:
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_elapsed, create_elapsed, run_elapsed
+        return BenchResult(pull_elapsed, create_elapsed, run_elapsed, size)
 
     def run_cmd_arg(self, repo, runargs):
-        assert len(runargs.mount) == 0
-
         image_ref = self.image_ref(repo)
         container_name = repo.replace(":", "-") + random_chars()
 
@@ -476,6 +444,8 @@ class BenchRunner:
         with timer(pull_cmd) as t:
             pull_elapsed = t
 
+        size = self.image_size(image_ref)
+
         create_cmd = self.create_cmd_arg_cmd(image_ref, container_name, runargs)
         print(create_cmd)
 
@@ -483,7 +453,7 @@ class BenchRunner:
         with timer(create_cmd) as t:
             create_elapsed = t
 
-        run_cmd = self.task_start_cmd(container_name, iteration=False)
+        run_cmd = self.task_start_cmd(container_name, iteration=True)
         print(run_cmd)
 
         with timer(run_cmd) as t:
@@ -492,7 +462,7 @@ class BenchRunner:
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_elapsed, create_elapsed, run_elapsed
+        return BenchResult(pull_elapsed, create_elapsed, run_elapsed, size)
 
     def run_cmd_arg_wait(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -504,6 +474,8 @@ class BenchRunner:
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
             pull_elapsed = t
+
+        size = self.image_size(image_ref)
 
         create_cmd = self.create_cmd_arg_wait_cmd(image_ref, container_name, runargs)
         print(create_cmd)
@@ -542,7 +514,7 @@ class BenchRunner:
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_elapsed, create_elapsed, run_elapsed
+        return BenchResult(pull_elapsed, create_elapsed, run_elapsed, size)
 
     def run_cmd_stdin(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -554,6 +526,8 @@ class BenchRunner:
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
             pull_elapsed = t
+
+        size = self.image_size(image_ref)
 
         create_cmd = self.create_cmd_stdin_cmd(image_ref, container_name, runargs)
         print(create_cmd)
@@ -590,7 +564,7 @@ class BenchRunner:
         if self.cleanup:
             self.clean_up(image_ref, container_name)
 
-        return pull_elapsed, create_elapsed, run_elapsed
+        return BenchResult(pull_elapsed, create_elapsed, run_elapsed, size)
 
     def run_cmd_url_wait(self, repo, runargs):
         image_ref = self.image_ref(repo)
@@ -602,6 +576,8 @@ class BenchRunner:
         print("Pulling image %s ..." % image_ref)
         with timer(pull_cmd) as t:
             pull_elapsed = t
+
+        size = self.image_size(image_ref)
 
         create_cmd = self.create_cmd_url_wait_cmd(image_ref, container_id, runargs)
         print(create_cmd)
@@ -634,25 +610,23 @@ class BenchRunner:
         if self.cleanup:
             self.clean_up(image_ref, container_id)
 
-        return pull_elapsed, create_elapsed, run_elapsed
+        return BenchResult(pull_elapsed, create_elapsed, run_elapsed, size)
 
     def run(self, bench):
         repo = image_repo(bench.name)
-        if repo in BenchRunner.ECHO_HELLO:
+        if repo in self.ECHO_HELLO:
             return self.run_echo_hello(repo=bench.name)
-        elif repo in BenchRunner.CMD_ARG:
-            return self.run_cmd_arg(repo=bench.name, runargs=BenchRunner.CMD_ARG[repo])
-        elif repo in BenchRunner.CMD_ARG_WAIT:
+        elif repo in self.CMD_ARG:
+            return self.run_cmd_arg(repo=bench.name, runargs=self.CMD_ARG[repo])
+        elif repo in self.CMD_ARG_WAIT:
             return self.run_cmd_arg_wait(
-                repo=bench.name, runargs=BenchRunner.CMD_ARG_WAIT[repo]
+                repo=bench.name, runargs=self.CMD_ARG_WAIT[repo]
             )
-        elif repo in BenchRunner.CMD_STDIN:
-            return self.run_cmd_stdin(
-                repo=bench.name, runargs=BenchRunner.CMD_STDIN[repo]
-            )
-        elif repo in BenchRunner.CMD_URL_WAIT:
+        elif repo in self.CMD_STDIN:
+            return self.run_cmd_stdin(repo=bench.name, runargs=self.CMD_STDIN[repo])
+        elif repo in self.CMD_URL_WAIT:
             return self.run_cmd_url_wait(
-                repo=bench.name, runargs=BenchRunner.CMD_URL_WAIT[repo]
+                repo=bench.name, runargs=self.CMD_URL_WAIT[repo]
             )
         else:
             print("Unknown bench: " + repo)
@@ -664,11 +638,32 @@ class BenchRunner:
             f"nerdctl --snapshotter {self.snapshotter} pull {insecure_flag} {image_ref}"
         )
 
+    def image_size(self, image_ref):
+        cmd = f"nerdctl images {str(image_ref)}"
+        print(cmd)
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        out = p.communicate()[0].decode("utf-8")
+        return " ".join(out.split()[-2:])
+
     def create_echo_hello_cmd(self, image_ref, container_id):
         return f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} -- echo hello"
 
     def create_cmd_arg_cmd(self, image_ref, container_id, runargs):
-        cmd = f"nerdctl --snapshotter {self.snapshotter} create --net=host --name={container_id} {image_ref} "
+        cmd = f"nerdctl --snapshotter {self.snapshotter} create --net=host "
+        if len(runargs.env) > 0:
+            env = " ".join(["--env %s=%s" % (k, v) for k, v in runargs.env.items()])
+            cmd += f" {env} "
+        for a, b in runargs.mount:
+            a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
+            a = tmp_copy(a)
+            cmd += f"--volume {a}:{b} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
+        cmd += f"--name={container_id} {image_ref} "
         return cmd + runargs.arg
 
     def create_cmd_arg_wait_cmd(self, image_ref, container_id, runargs):
@@ -680,9 +675,15 @@ class BenchRunner:
             a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
             a = tmp_copy(a)
             cmd += f"--volume {a}:{b} "
-        cmd += f"--name={container_id} {image_ref}"
+        cmd += f"--name={container_id} {image_ref} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
         if len(runargs.arg) > 0:
-            cmd += f" -- {runargs.arg} "
+            cmd += f"{runargs.arg} "
 
         return cmd
 
@@ -692,9 +693,15 @@ class BenchRunner:
             a = os.path.join(os.path.dirname(os.path.abspath(__file__)), a)
             a = tmp_copy(a)
             cmd += f"--volume {a}:{b} "
-        cmd += f"--name={container_id} {image_ref}"
+        cmd += f"--name={container_id} {image_ref} "
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
         if runargs.stdin_sh:
-            cmd += f" -- {runargs.stdin_sh}"  # e.g., sh -c
+            cmd += f"-- {runargs.stdin_sh}"  # e.g., sh -c
         return cmd
 
     def create_cmd_url_wait_cmd(self, image_ref, container_id, runargs):
@@ -706,9 +713,15 @@ class BenchRunner:
         if len(runargs.env) > 0:
             env = " ".join([f"--env {k}={v}" for k, v in runargs.env.items()])
             cmd += f" {env} "
-        cmd += f"--name={container_id} {image_ref}"
+        if len(runargs.runtime) > 0:
+            cmd += f"--runtime {runargs.runtime} "
+        if len(runargs.shmSize) > 0:
+            cmd += f"--shm-size {runargs.shmSize} "
+        if len(runargs.workDir) > 0:
+            cmd += f"-w {runargs.workDir} "
+        cmd += f"--name={container_id} {image_ref} "
         if len(runargs.arg) > 0:
-            cmd += f" -- {runargs.arg} "
+            cmd += f"{runargs.arg} "
         return cmd
 
     def task_start_cmd(self, container_id, iteration: bool):
@@ -847,6 +860,13 @@ def main():
     )
 
     parser.add_argument(
+        "--bench-config",
+        dest="bench_config",
+        required=False,
+        default="bench.yaml",
+    )
+
+    parser.add_argument(
         "--out-format",
         dest="output_format",
         type=str,
@@ -858,7 +878,7 @@ def main():
         "--bench-times",
         dest="bench_times",
         type=int,
-        default= 1,
+        default=1,
     )
 
     args = parser.parse_args()
@@ -872,16 +892,29 @@ def main():
     snapshotter = args.snapshotter
     cleanup = not args.no_cleanup
     insecure_registry = args.insecure_registry
+    bench_config = args.bench_config
+
+    runner = BenchRunner(
+        docker=docker,
+        registry=registry,
+        registry2=registry2,
+        snapshotter=snapshotter,
+        cleanup=cleanup,
+        insecure_registry=insecure_registry,
+        bench_config=bench_config,
+    )
+
+    runner.load_bench_config()
 
     output_format = args.output_format
     bench_times = args.bench_times
 
     if all_supported_images:
-        benches.extend(BenchRunner.ALL.values())
+        benches.extend(runner.ALL.values())
     else:
         for i in images_list:
             try:
-                bench = copy.deepcopy(BenchRunner.ALL[image_repo(i)])
+                bench = copy.deepcopy(runner.ALL[image_repo(i)])
 
                 tag = image_tag(i)
                 if tag is not None:
@@ -895,24 +928,20 @@ def main():
     op = kvargs.pop("op", "run")
     f = open(outpath + "." + output_format, "w")
 
-    # run benchmarks
-    runner = BenchRunner(
-        docker=docker,
-        registry=registry,
-        registry2=registry2,
-        snapshotter=snapshotter,
-        cleanup=cleanup,
-        insecure_registry=insecure_registry,
-    )
-
     if output_format == "csv":
-        csv_headers = "timestamp,repo,bench,pull_elapsed(s),create_elapsed(s),run_elapsed(s),total_elapsed(s)"
+        csv_headers = "timestamp,repo,bench,pull_elapsed(s),create_elapsed(s),run_elapsed(s),total_elapsed(s),image_size"
         f.writelines(csv_headers + "\n")
         f.flush()
 
     for bench in benches:
         for _ in range(bench_times):
-            pull_elapsed, create_elapsed, run_elapsed = runner.operation(op, bench)
+            bench_result = runner.operation(op, bench)
+            pull_elapsed, create_elapsed, run_elapsed, size = (
+                bench_result.pull_elapsed,
+                bench_result.create_elapsed,
+                bench_result.run_elapsed,
+                bench_result.size,
+            )
 
             total_elapsed = f"{pull_elapsed + create_elapsed + run_elapsed: .6f}"
             timetamp = int(time.time() * 1000)
@@ -929,10 +958,11 @@ def main():
                     "create_elapsed": create_elapsed,
                     "run_elapsed": run_elapsed,
                     "total_elapsed": total_elapsed,
+                    "image_size": size,
                 }
                 line = json.dumps(row)
             elif output_format == "csv":
-                line = f"{timetamp},{bench.repo},{bench.name},{pull_elapsed},{create_elapsed},{run_elapsed},{total_elapsed}"
+                line = f"{timetamp},{bench.repo},{bench.name},{pull_elapsed},{create_elapsed},{run_elapsed},{total_elapsed},{size}"
 
             print(line)
             f.writelines(line + "\n")

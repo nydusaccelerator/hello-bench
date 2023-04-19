@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!python3
 
 import os
 import json
@@ -29,6 +29,7 @@ print("data_dir: %s, result_dir: %s" % (data_dir, result_dir))
 
 def to_csv():
     average_list = []
+    image_size = dict()
     for current_dir, _, file_list in os.walk(data_dir):
         for filename in file_list:
             filename_path = os.path.join(current_dir, filename)
@@ -38,16 +39,17 @@ def to_csv():
                     if line.strip() != "":
                         json_line = json.loads(line)
                         image = json_line["bench"]
-                        pull_time = json_line["pull_time"]
-                        create_time = json_line["create_time"]
-                        run_time = json_line["run_time"]
+                        pull_elapsed = json_line["pull_elapsed"]
+                        create_elapsed = json_line["create_elapsed"]
+                        run_elapsed = json_line["run_elapsed"]
+                        image_size[image] = json_line["image_size"]
 
                         average_list.append(
                             {
                                 "image": image,
-                                "pull": pull_time,
-                                "create": create_time,
-                                "run": run_time,
+                                "pull": float(pull_elapsed),
+                                "create": float(create_elapsed),
+                                "run": float(run_elapsed),
                             }
                         )
 
@@ -103,8 +105,8 @@ def to_csv():
     if os.path.exists(result_dir):
         shutil.rmtree(result_dir, ignore_errors=True)
     os.mkdir(result_dir)
-    os.mkdir(os.path.join(result_dir, "/", sub_data_dir))
-    os.mkdir(os.path.join(result_dir, "/", sub_picture_dir))
+    os.mkdir(result_dir + "/" + sub_data_dir)
+    os.mkdir(result_dir + "/" + sub_picture_dir)
 
     type_order = CategoricalDtype(["pull", "create", "run"], ordered=True)
     all_data_pd_line = []
@@ -114,7 +116,7 @@ def to_csv():
         data_pd["type"] = data_pd["type"].astype(type_order)
         data_pd.sort_values(by="type", inplace=True, ascending=True)
         print(key, data_pd)
-        data_pd.to_csv(os.path.join(result_dir, "/", sub_data_dir, "/", key, ".csv"))
+        data_pd.to_csv(result_dir + "/" + sub_data_dir + "/" + key + ".csv")
 
         for image_name, image_data in data_pd.groupby("image"):
             all_data_pd_line = all_data_pd_line + [
@@ -123,21 +125,18 @@ def to_csv():
                     "pull": image_data[image_data["type"] == "pull"]["mean"].mean(),
                     "create": image_data[image_data["type"] == "create"]["mean"].mean(),
                     "run": image_data[image_data["type"] == "run"]["mean"].mean(),
+                    "size": image_size[image_name],
                 }
             ]
     all_data_pd = pd.DataFrame(all_data_pd_line)
-    all_data_pd.to_csv(os.path.join(result_dir, "/", "all_mean.csv"))
+    all_data_pd.to_csv(result_dir + "/" + "all_mean.csv")
 
 
 def draw():
-    if os.path.exists(os.path.join(result_dir, "/", sub_picture_dir)):
-        shutil.rmtree(
-            os.path.join(result_dir, "/", sub_picture_dir), ignore_errors=True
-        )
-    os.mkdir(os.path.join(result_dir, "/", sub_picture_dir))
-    for current_dir, _, file_list in os.walk(
-        os.path.join(result_dir, "/", sub_data_dir)
-    ):
+    if os.path.exists(result_dir + "/" + sub_picture_dir):
+        shutil.rmtree(result_dir + "/" + sub_picture_dir, ignore_errors=True)
+    os.mkdir(result_dir + "/" + sub_picture_dir)
+    for current_dir, _, file_list in os.walk(result_dir + "/" + sub_data_dir):
         for filename in file_list:
             filename_path = os.path.join(current_dir, filename)
             print("file: ", filename_path)
@@ -145,12 +144,12 @@ def draw():
             print(data_pd)
 
             for index, data_series in data_pd.iterrows():
-                picture_path = os.path.join(
-                    result_dir,
-                    "/",
-                    sub_picture_dir,
-                    "/",
-                    data_series["image"].split(":")[0],
+                picture_path = (
+                    result_dir
+                    + "/"
+                    + sub_picture_dir
+                    + "/"
+                    + data_series["image"].split(":")[0]
                 )
                 if not os.path.exists(picture_path):
                     os.mkdir(picture_path)
@@ -178,21 +177,23 @@ def draw():
                 plt.xlabel(None)
                 plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
                 plt.savefig(
-                    os.path.join(
-                        picture_path,
-                        "/",
-                        data_series["image"].replace(":", "-"),
-                        "_",
-                        data_series["type"],
-                        ".png",
-                    )
+                    picture_path
+                    + "/"
+                    + data_series["image"].replace(":", "-")
+                    + "_"
+                    + data_series["type"]
+                    + ".png"
                 )
 
 
+def image_info(row):
+    tag = "latest" if len(row["image"].split(":")) <= 1 else row["image"].split(":")[1]
+    size = row["size"]
+    return f"{tag}\n({size})"
+
+
 def draw_all():
-    all_data_pd = pd.read_csv(
-        os.path.join(result_dir, "/", "all_mean.csv"), index_col=0
-    )
+    all_data_pd = pd.read_csv(result_dir + "/" + "all_mean.csv", index_col=0)
 
     print(all_data_pd)
     all_data = dict()
@@ -203,6 +204,7 @@ def draw_all():
                 "pull": data["pull"].mean(),
                 "create": data["create"].mean(),
                 "run": data["run"].mean(),
+                "size": data["size"].item(),
             }
         ]
 
@@ -215,6 +217,9 @@ def draw_all():
     for key in all_data:
         data_pd = pd.DataFrame(all_data[key])
         fig, ax = plt.subplots()
+
+        data_pd["image"] = data_pd.apply(lambda row: image_info(row), axis=1)
+
         print(data_pd)
         ax.bar(data_pd["image"], data_pd["pull"], label="pull")
         ax.bar(
@@ -228,10 +233,11 @@ def draw_all():
         )
 
         ax.legend(bbox_to_anchor=(1.26, 1))
+        ax.set_title(key)
         plt.subplots_adjust(left=0.12, bottom=0.32, right=0.798, top=0.88)
-        plt.xticks(rotation=45)
+        plt.xticks(rotation=20)
         plt.ylabel("time(s)")
-        plt.savefig(os.path.join(result_dir, "/", key, ".png"))
+        plt.savefig(result_dir + "/" + key + ".png")
 
 
 if __name__ == "__main__":

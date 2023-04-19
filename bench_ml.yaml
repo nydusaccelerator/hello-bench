@@ -1,0 +1,76 @@
+CMD_ARG:
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+  category: machine-learning
+  image: chat-bench
+  repo: ml_platform
+
+CMD_ARG_WAIT:
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    arg: ./test.sh
+    stdin_sh: sh
+    mount:
+    - container_path: /pytorch
+      host_path: misc/mount/pytorch
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+    work_dir: /pytorch
+    wait_line: 'benchmark end'
+  category: machine-learning
+  image: pytorch
+  repo: ml_platform
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    arg: python tf_cnn_benchmarks.py --batch_size=32 --model=resnet152_v2 --variable_update=parameter_server
+    stdin_sh: sh
+    mount:
+    - container_path: /tf_cnn_benchmarks
+      host_path: misc/mount/tf_cnn_benchmarks
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+    work_dir: /tf_cnn_benchmarks
+    wait_line: 'total images'
+  category: machine-learning
+  image: tensorflow
+  repo: ml_platform
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    arg: /opt/ml-platform/ddp.sh --num-iters 1000
+    stdin_sh: sh
+    mount:
+    - container_path: /tf_cnn_benchmarks
+      host_path: misc/mount/tf_cnn_benchmarks
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+    wait_line: 'Img/sec'
+  category: machine-learning
+  image: tensorflow
+  repo: ml_platform
+
+CMD_URL_WAIT:
+- bench_args:
+    envs:
+    - key: NVIDIA_VISIBLE_DEVICES
+      value: 'all'
+    arg: tritonserver --model-repository=/models
+    stdin_sh: sh
+    mount:
+    - container_path: /models
+      host_path: misc/mount/model_repository
+    runtime: nvidia-container-runtime
+    shm_size: 8gb
+    wait_url: http://127.0.0.1:8000/v2/health/ready
+  category: machine-learning
+  image: tritonserver
+  repo: ml_platform
